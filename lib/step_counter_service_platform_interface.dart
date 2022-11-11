@@ -28,6 +28,8 @@ abstract class StepCounterServicePlatform extends PlatformInterface
     _instance = instance;
   }
 
+  Future<bool> checkSensorAvailability();
+
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,
   });

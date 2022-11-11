@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -121,16 +122,12 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                     result.error("start_service_error", e.message, null)
                 }
             }
-//            "stopService" -> {
-//                try {
-//                    StepCounterService.setManuallyStopped(context, true)
-//                    val intent = Intent(context, StepCounterService::class.java)
-//                    context.stopService(intent)
-//                    result.success(null)
-//                } catch (e: Exception) {
-//                    result.error("start_service_error", e.message, null)
-//                }
-//            }
+            "checkSensorsAvailability" -> {
+                val hasStepCounterSensor: Boolean =
+                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
+                result.success(hasStepCounterSensor)
+
+            }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isRunning.get())
             }

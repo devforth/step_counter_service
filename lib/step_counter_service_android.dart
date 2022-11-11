@@ -49,6 +49,12 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
+  Future<bool> checkSensorAvailability() async {
+    bool? result = await _channel.invokeMethod("checkSensorAvailability");
+    return result ?? false;
+  }
+
+  @override
   Future<void> configure(
       {required AndroidConfiguration androidConfiguration}) async {
     _channel.setMethodCallHandler(_handle);
