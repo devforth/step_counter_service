@@ -1,0 +1,34 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.devforth.step_counter_service">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application>
+        <service
+            android:name=".StepCounterService"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":background"
+            android:stopWithTask="false" />
+
+        <receiver
+            android:name=".OnBootBroadcastReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":background">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".WatchdogBroadcastReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":background" />
+
+    </application>
+</manifest>
