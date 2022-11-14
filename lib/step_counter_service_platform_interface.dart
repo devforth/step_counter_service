@@ -35,8 +35,10 @@ abstract class StepCounterServicePlatform extends PlatformInterface
   });
 
   Future<void> startService();
+  Future<bool> stopService();
 
   Future<bool> isServiceRunning();
+  Future<bool> setServiceForeground(bool value);
 }
 
 abstract class Observable {
@@ -44,7 +46,7 @@ abstract class Observable {
   Stream<Map<String, dynamic>?> on(String method);
 }
 
-abstract class ServiceInstance /* implements Observable */ {
+abstract class ServiceInstance implements Observable {
   Stream<int> onUpdateSteps();
 
   Future<void> updateNotification({

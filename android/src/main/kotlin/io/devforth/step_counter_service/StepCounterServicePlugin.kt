@@ -85,7 +85,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
         intent.putExtra("binder_id", serviceBinderId);
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && StepCounterService.isForeground(context)) {
             context.startForegroundService(intent)
         } else {
             context.startService(intent)
@@ -105,6 +105,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                 preferences.edit()
                     .putLong("on_start_handle", arg.getLong("on_start_handle"))
                     .putBoolean("start_on_boot", arg.getBoolean("start_on_boot"))
+                    .putBoolean("foreground", arg.getBoolean("foreground"))
                     .putString("default_notification_title", arg.getString("default_notification_title"))
                     .putString("default_notification_content", arg.getString("default_notification_content"))
                     .apply()
@@ -122,23 +123,38 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                     result.error("start_service_error", e.message, null)
                 }
             }
+            "stopService" -> {
+                if (serviceBinder != null) {
+                    serviceBinder!!.invokeInternal("stop", null)
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+            }
             "checkSensorsAvailability" -> {
                 val hasStepCounterSensor: Boolean =
                     context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
                 result.success(hasStepCounterSensor)
-
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isRunning.get())
             }
-//            "invoke" -> {
-//                if (serviceBinder != null) {
-//                    serviceBinder!!.invoke(call.arguments.toString())
-//                    result.success(true)
-//                } else {
-//                    result.success(false)
-//                }
-//            }
+            "setServiceForeground" -> {
+                if (serviceBinder != null) {
+                    serviceBinder!!.invokeInternal("setForeground", call.arguments.toString())
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+            }
+            "invoke" -> {
+                if (serviceBinder != null) {
+                    serviceBinder!!.invoke(call.arguments.toString())
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+            }
             else -> {
                 result.notImplemented()
             }

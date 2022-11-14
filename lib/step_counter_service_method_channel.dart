@@ -22,7 +22,17 @@ class MethodChannelStepCounterService extends StepCounterServicePlatform {
   }
 
   @override
+  Future<bool> stopService() {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<bool> isServiceRunning() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> setServiceForeground(bool value) {
     throw UnimplementedError();
   }
 

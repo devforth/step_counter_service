@@ -20,12 +20,10 @@ class StepCounterService /* implements Observable */ {
 
   factory StepCounterService() => _instance;
 
-  // @override
-  // Stream<Map<String, dynamic>?> on(String method) => _platform.on(method);
+  Stream<Map<String, dynamic>?> on(String method) => _platform.on(method);
 
-  // @override
-  // void invoke(String method, [Map<String, dynamic>? args]) =>
-  //     _platform.invoke(method, args);
+  void invoke(String method, [Map<String, dynamic>? args]) =>
+      _platform.invoke(method, args);
 
   Future<bool> checkSensorAvailability() => _platform.checkSensorAvailability();
 

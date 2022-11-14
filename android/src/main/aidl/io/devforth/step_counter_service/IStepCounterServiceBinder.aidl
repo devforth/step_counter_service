@@ -8,4 +8,5 @@ interface IStepCounterServiceBinder {
     void bind(int id, IStepCounterService service);
     void unbind(int id);
     void invoke(String data);
+    void invokeInternal(String method, String data);
 }

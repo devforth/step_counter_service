@@ -66,8 +66,6 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             val pIntent = PendingIntent.getBroadcast(context, WATCHDOG_REQUEST_CODE, intent, flags)
 
             // Check is background service every 5 seconds
-
-            // Check is background service every 5 seconds
             AlarmManagerCompat.setAndAllowWhileIdle(
                 manager,
                 AlarmManager.RTC_WAKEUP,
@@ -86,6 +84,18 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             val sharedPreferences =
                 context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
             sharedPreferences.edit().putBoolean("is_manually_stopped", value).apply()
+        }
+
+        fun isForeground(context: Context): Boolean {
+            val sharedPreferences =
+                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
+            return sharedPreferences.getBoolean("foreground", false)
+        }
+
+        fun setForeground(context: Context, value: Boolean) {
+            val sharedPreferences =
+                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
+            return sharedPreferences.edit().putBoolean("foreground", value).apply()
         }
     }
 
@@ -235,6 +245,14 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 }
             }
         }
+
+        override fun invokeInternal(method: String, data: String?) {
+            this@StepCounterService.onMethodCall(MethodCall(method, data?.let { JSONObject(it) }), object : MethodChannel.Result {
+                override fun success(result: Any?) {}
+                override fun notImplemented() {}
+                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {}
+            })
+        }
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -348,6 +366,24 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 val handle: Long = sharedPreferences.getLong("on_start_handle", 0)
                 result.success(handle)
             }
+            "setForeground" -> {
+                val arg = call.arguments as JSONObject
+                val value = arg.getBoolean("value")
+
+                val currentValue = isForeground(this)
+                setForeground(this, value)
+
+                if (currentValue != value) {
+                    if (value) {
+                        startForeground(FOREGROUND_ID, notificationBuilder.build())
+                        flutterEngine?.serviceControlSurface?.onMoveToForeground()
+                    } else {
+                        stopForeground(true)
+                        flutterEngine?.serviceControlSurface?.onMoveToBackground()
+                    }
+                }
+
+            }
             "stop" -> {
                 setManuallyStopped(this, true)
                 val intent = Intent(this, WatchdogBroadcastReceiver::class.java)
@@ -375,14 +411,14 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 stopSelf()
                 result.success(true)
             }
-//            "invoke" -> {
-//                try {
-//                    invoke(call.arguments.toString())
-//                    result.success(true)
-//                } catch (e: Exception) {
-//                    e.printStackTrace()
-//                }
-//            }
+            "invoke" -> {
+                try {
+                    invoke(call.arguments.toString())
+                    result.success(true)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             else -> result.notImplemented()
         }
     }

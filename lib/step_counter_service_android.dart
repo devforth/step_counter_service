@@ -85,8 +85,20 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
+  Future<bool> stopService() async {
+    bool? value = await _channel.invokeMethod("stopService");
+    return value ?? false;
+  }
+
+  @override
   Future<bool> isServiceRunning() async {
-    var result = await _channel.invokeMethod("isServiceRunning");
+    bool? result = await _channel.invokeMethod("isServiceRunning");
+    return result ?? false;
+  }
+
+  @override
+  Future<bool> setServiceForeground(bool value) async {
+    bool? result = await _channel.invokeMethod("setServiceForeground", { "value": value });
     return result ?? false;
   }
 
@@ -129,15 +141,15 @@ class AndroidServiceInstance extends ServiceInstance {
     }
   }
 
-  // @override
-  // void invoke(String method, [Map<String, dynamic>? args]) {
-  //   _channel.invokeMethod('sendData', {
-  //     'method': method,
-  //     'args': args,
-  //   });
-  // }
+  @override
+  void invoke(String method, [Map<String, dynamic>? args]) {
+    _channel.invokeMethod('sendData', {
+      'method': method,
+      'args': args,
+    });
+  }
 
-  Stream<Map<String, dynamic>?> _on(String method) {
+  Stream<Map<String, dynamic>?> on(String method) {
     return _controller.stream.transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) {
@@ -154,7 +166,7 @@ class AndroidServiceInstance extends ServiceInstance {
   }
 
   @override
-  Stream<int> onUpdateSteps() => _on("updateSteps")
+  Stream<int> onUpdateSteps() => on("updateSteps")
       .transform(StreamTransformer.fromHandlers(
       handleData: (data, sink) {
         if (data?['steps'] != null) {
