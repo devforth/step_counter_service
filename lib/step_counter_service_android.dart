@@ -71,6 +71,7 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
       {
         "on_start_handle": handle.toRawHandle(),
         "start_on_boot": androidConfiguration.startOnBoot,
+        "foreground": androidConfiguration.foreground,
         "default_notification_content":
             androidConfiguration.defaultNotificationContent,
         "default_notification_title":

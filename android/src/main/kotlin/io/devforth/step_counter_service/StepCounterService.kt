@@ -219,8 +219,9 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     private val binder: IStepCounterServiceBinder.Stub = object : IStepCounterServiceBinder.Stub() {
         override fun bind(id: Int, service: IStepCounterService?) {
             synchronized(listeners) {
-                listeners.put(id, service!!)
+                listeners[id] = service!!
             }
+            lastStepsValue?.let { service!!.invoke(updateStepsMessage(it).toString()) }
         }
 
         override fun unbind(id: Int) {
@@ -256,6 +257,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     }
 
     override fun onBind(intent: Intent): IBinder {
+        lastStepsValue?.let { binder.invoke(updateStepsMessage(it).toString()) }
         return binder
     }
 
@@ -275,18 +277,23 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     }
 
     private val scope = CoroutineScope(Dispatchers.Default)
-    private val updateStepsFlow = MutableStateFlow(-1)
+    private val updateStepsFlow = MutableStateFlow<Int?>(null)
+    private var lastStepsValue: Int? = null;
+
+    private fun updateStepsMessage(steps: Int): JSONObject {
+        return JSONObject(mapOf("method" to "updateSteps", "args" to mapOf("steps" to steps)))
+    }
 
     init {
         scope.launch {
             updateStepsFlow.debounce(1000).collect {
-                if (it == -1) return@collect
+                if (it == null) return@collect
 
                 Log.d("StepCounterService", "GOT IT $it")
 
-                val updateStepsData =
-                    JSONObject(mapOf("method" to "updateSteps", "args" to mapOf("steps" to it)))
-                val data = updateStepsData.toString()
+                val data = updateStepsMessage(it).toString()
+
+                lastStepsValue = it;
 
                 this@StepCounterService.invoke(data)
                 this@StepCounterService.binder.invoke(data)
