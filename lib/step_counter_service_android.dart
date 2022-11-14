@@ -144,7 +144,7 @@ class AndroidServiceInstance extends ServiceInstance {
 
   @override
   void invoke(String method, [Map<String, dynamic>? args]) {
-    _channel.invokeMethod('sendData', {
+    _channel.invokeMethod('invoke', {
       'method': method,
       'args': args,
     });
