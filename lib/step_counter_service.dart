@@ -10,7 +10,7 @@ export 'step_counter_service_platform_interface.dart' show ServiceInstance;
 
 export 'step_counter_service_android.dart' show StepCounterServiceAndroid;
 
-class StepCounterService /* implements Observable */ {
+class StepCounterService implements Observable {
   StepCounterServicePlatform get _platform =>
       StepCounterServicePlatform.instance;
 
@@ -20,8 +20,10 @@ class StepCounterService /* implements Observable */ {
 
   factory StepCounterService() => _instance;
 
+  @override
   Stream<Map<String, dynamic>?> on(String method) => _platform.on(method);
 
+  @override
   void invoke(String method, [Map<String, dynamic>? args]) =>
       _platform.invoke(method, args);
 
