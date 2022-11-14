@@ -86,20 +86,8 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
-  Future<bool> stopService() async {
-    bool? value = await _channel.invokeMethod("stopService");
-    return value ?? false;
-  }
-
-  @override
   Future<bool> isServiceRunning() async {
     bool? result = await _channel.invokeMethod("isServiceRunning");
-    return result ?? false;
-  }
-
-  @override
-  Future<bool> setServiceForeground(bool value) async {
-    bool? result = await _channel.invokeMethod("setServiceForeground", { "value": value });
     return result ?? false;
   }
 
@@ -150,6 +138,7 @@ class AndroidServiceInstance extends ServiceInstance {
     });
   }
 
+  @override
   Stream<Map<String, dynamic>?> on(String method) {
     return _controller.stream.transform(
       StreamTransformer.fromHandlers(
@@ -190,5 +179,10 @@ class AndroidServiceInstance extends ServiceInstance {
       "title": title,
       "content": content,
     });
+  }
+
+  @override
+  Future<void> setForeground(bool value) async {
+    await _channel.invokeMethod("setForeground", { "value": value });
   }
 }

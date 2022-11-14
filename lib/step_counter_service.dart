@@ -34,9 +34,6 @@ class StepCounterService implements Observable {
   }) => _platform.configure(androidConfiguration: androidConfiguration);
 
   Future<void> startService() => _platform.startService();
-  Future<bool> stopService() => _platform.stopService();
-
-  Future<bool> setServiceForeground(bool value) => _platform.setServiceForeground(value);
 
   Future<bool> isServiceRunning() => _platform.isServiceRunning();
 

@@ -255,6 +255,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         }
 
         override fun invokeInternal(method: String, data: String?) {
+            Log.d("Binder", "invokeInternal")
             this@StepCounterService.onMethodCall(MethodCall(method, data?.let { JSONObject(it) }), object : MethodChannel.Result {
                 override fun success(result: Any?) {}
                 override fun notImplemented() {}

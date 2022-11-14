@@ -35,10 +35,8 @@ abstract class StepCounterServicePlatform extends PlatformInterface
   });
 
   Future<void> startService();
-  Future<bool> stopService();
 
   Future<bool> isServiceRunning();
-  Future<bool> setServiceForeground(bool value);
 }
 
 abstract class Observable {
@@ -55,4 +53,6 @@ abstract class ServiceInstance implements Observable {
   });
 
   Future<void> stop();
+
+  Future<void> setForeground(bool value);
 }

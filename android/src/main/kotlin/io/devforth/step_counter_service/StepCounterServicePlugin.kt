@@ -123,14 +123,6 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                     result.error("start_service_error", e.message, null)
                 }
             }
-            "stopService" -> {
-                if (serviceBinder != null) {
-                    serviceBinder!!.invokeInternal("stop", null)
-                    result.success(true)
-                } else {
-                    result.success(false)
-                }
-            }
             "checkSensorsAvailability" -> {
                 val hasStepCounterSensor: Boolean =
                     context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
@@ -138,14 +130,6 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isServiceRunning(context))
-            }
-            "setServiceForeground" -> {
-                if (serviceBinder != null) {
-                    serviceBinder!!.invokeInternal("setForeground", call.arguments.toString())
-                    result.success(true)
-                } else {
-                    result.success(false)
-                }
             }
             "invoke" -> {
                 if (serviceBinder != null) {
