@@ -123,7 +123,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                     result.error("start_service_error", e.message, null)
                 }
             }
-            "checkSensorsAvailability" -> {
+            "checkSensorAvailability" -> {
                 val hasStepCounterSensor: Boolean =
                     context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
                 result.success(hasStepCounterSensor)
