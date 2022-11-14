@@ -97,6 +97,13 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
             return sharedPreferences.edit().putBoolean("foreground", value).apply()
         }
+
+        @Suppress("DEPRECATION")
+        fun isServiceRunning(context: Context): Boolean {
+            return (context.getSystemService(ACTIVITY_SERVICE) as ActivityManager)
+                .getRunningServices(Integer.MAX_VALUE)
+                .any { it -> it.service.className == StepCounterService::class.java.name }
+        }
     }
 
     private lateinit var handler: Handler

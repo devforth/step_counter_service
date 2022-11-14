@@ -137,7 +137,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                 result.success(hasStepCounterSensor)
             }
             "isServiceRunning" -> {
-                result.success(StepCounterService.isRunning.get())
+                result.success(StepCounterService.isServiceRunning(context))
             }
             "setServiceForeground" -> {
                 if (serviceBinder != null) {
