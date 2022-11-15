@@ -95,15 +95,6 @@ public class SwiftStepCounterServicePlugin: FlutterPluginAppLifeCycleDelegate, F
         registrar.addApplicationDelegate(instance)
     }
 
-    private func autoStart(isForeground: Bool) {
-        let defaults = UserDefaults.standard
-        let autoStart = defaults.bool(forKey: "auto_start")
-        if (autoStart) {
-            // self.runForegroundWorker()
-            self.runListenerSteps()
-        }
-    }
-
     fileprivate var stepsWorker: StepCounter? = nil
     private func runListenerSteps() {
         if (stepsWorker != nil){
@@ -136,10 +127,7 @@ public class SwiftStepCounterServicePlugin: FlutterPluginAppLifeCycleDelegate, F
             defaults.set(backgroundCallbackHandleID?.int64Value, forKey: "background_callback_handle")
             defaults.set(autoStart, forKey: "auto_start")
             
-            if (autoStart && (foregroundCallbackHandleID != nil)){
-                self.autoStart(isForeground: true)
-            }
-            
+            self.runListenerSteps()
             result(true)
             return
         }
@@ -186,7 +174,7 @@ private class FlutterBackgroundFetchWorker {
         
         if (isRunning){
             StepCounterServicePlugin.register(engine)
-            
+
             let binaryMessenger = engine.binaryMessenger
             channel = FlutterMethodChannel(name: "id.devforth/step_counter_service_ios_bg", binaryMessenger: binaryMessenger, codec: FlutterJSONMethodCodec())
             channel?.setMethodCallHandler(handleMethodCall)
