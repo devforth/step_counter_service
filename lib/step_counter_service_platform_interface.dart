@@ -32,6 +32,7 @@ abstract class StepCounterServicePlatform extends PlatformInterface
 
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,
+    required IosConfiguration iosConfiguration,
   });
 
   Future<void> startService();

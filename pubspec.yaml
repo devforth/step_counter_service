@@ -39,7 +39,8 @@ flutter:
         pluginClass: StepCounterServicePlugin
         dartPluginClass: StepCounterServiceAndroid
       ios:
-        pluginClass: StepCounterServicePlugin
+        pluginClass: SwiftStepCounterServicePlugin
+        dartPluginClass: StepCounterServiceIos
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

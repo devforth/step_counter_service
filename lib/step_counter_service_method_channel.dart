@@ -12,7 +12,10 @@ class MethodChannelStepCounterService extends StepCounterServicePlatform {
 
 
   @override
-  Future<void> configure({required AndroidConfiguration androidConfiguration}) {
+  Future<void> configure({
+    required IosConfiguration iosConfiguration,
+    required AndroidConfiguration androidConfiguration,
+  }) {
     throw UnimplementedError();
   }
 

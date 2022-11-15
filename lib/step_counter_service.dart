@@ -9,6 +9,7 @@ import 'step_counter_service_platform_interface.dart';
 export 'step_counter_service_platform_interface.dart' show ServiceInstance;
 
 export 'step_counter_service_android.dart' show StepCounterServiceAndroid;
+export 'step_counter_service_ios.dart' show StepCounterServiceIos;
 
 class StepCounterService implements Observable {
   StepCounterServicePlatform get _platform =>
@@ -31,7 +32,8 @@ class StepCounterService implements Observable {
 
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,
-  }) => _platform.configure(androidConfiguration: androidConfiguration);
+    required IosConfiguration iosConfiguration,
+  }) => _platform.configure(androidConfiguration: androidConfiguration, iosConfiguration: iosConfiguration);
 
   Future<void> startService() => _platform.startService();
 

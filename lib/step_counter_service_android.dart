@@ -55,8 +55,10 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
-  Future<void> configure(
-      {required AndroidConfiguration androidConfiguration}) async {
+  Future<void> configure({
+    required IosConfiguration iosConfiguration,
+    required AndroidConfiguration androidConfiguration,
+  }) async {
     _channel.setMethodCallHandler(_handle);
 
     final CallbackHandle? handle =
@@ -157,13 +159,11 @@ class AndroidServiceInstance extends ServiceInstance {
 
   @override
   Stream<int> onUpdateSteps() => on("updateSteps")
-      .transform(StreamTransformer.fromHandlers(
-      handleData: (data, sink) {
+          .transform(StreamTransformer.fromHandlers(handleData: (data, sink) {
         if (data?['steps'] != null) {
           sink.add(data!['steps']!);
         }
-      }
-  ));
+      }));
 
   @override
   Future<void> stop() async {
