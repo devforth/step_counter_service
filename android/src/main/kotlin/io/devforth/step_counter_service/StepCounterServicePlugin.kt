@@ -81,6 +81,8 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
 
 
     private fun startService() {
+        StepCounterService.enqueueWatchdog(context)
+
         val intent = Intent(context, StepCounterService::class.java)
         intent.putExtra("binder_id", serviceBinderId);
 

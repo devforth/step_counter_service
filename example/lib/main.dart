@@ -19,6 +19,14 @@ void onStart(ServiceInstance serviceInstance) {
     print("BG GOT STEPS $steps");
     serviceInstance.updateNotification(title: "Example Title BG", content: "Example Content. Steps: $steps");
   });
+
+  bool value = true;
+
+  serviceInstance.on('setForeground').listen((event) {
+    print(event?['value'].runtimeType);
+    value = !value;
+    serviceInstance.setForeground(value);
+  });
 }
 
 class MyApp extends StatefulWidget {
@@ -70,7 +78,12 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Text('Step count: $_stepCount\n'),
+          child: GestureDetector(
+            child: Text('Step count: $_stepCount\n'),
+            onTap: () => {
+              service.invoke('setForeground', { 'value': false })
+            },
+          ),
         ),
       ),
     );

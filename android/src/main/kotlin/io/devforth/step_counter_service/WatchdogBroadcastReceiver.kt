@@ -10,13 +10,14 @@ class WatchdogBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         Log.d("WatchdogBR", "onReceive")
 
+        val serviceIntent = Intent(context, StepCounterService::class.java)
+
         if (!StepCounterService.isManuallyStopped(context)) {
-            ContextCompat.startForegroundService(
-                context, Intent(
-                    context,
-                    StepCounterService::class.java
-                )
-            )
+            if (StepCounterService.isForeground(context)) {
+                ContextCompat.startForegroundService(context, serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
         }
     }
 }

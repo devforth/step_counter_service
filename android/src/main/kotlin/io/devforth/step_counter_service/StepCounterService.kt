@@ -51,7 +51,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         }
 
         private val WATCHDOG_REQUEST_CODE = 0x12412
-        fun enqueueWatchdog(context: Context) {
+        fun enqueueWatchdog(context: Context, millis: Int = 5000) {
             val intent = Intent(
                 context,
                 WatchdogBroadcastReceiver::class.java
@@ -69,7 +69,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             AlarmManagerCompat.setAndAllowWhileIdle(
                 manager,
                 AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + 5000,
+                System.currentTimeMillis() + millis,
                 pIntent
             )
         }
@@ -189,7 +189,10 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
         setManuallyStopped(this, false)
         enqueueWatchdog(this)
-        startForeground(FOREGROUND_ID, notificationBuilder.build())
+
+        if (isForeground(this)) {
+            startForeground(FOREGROUND_ID, notificationBuilder.build())
+        }
 
         return START_STICKY
     }
@@ -220,6 +223,12 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         isRunning.set(false)
 
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (isRunning.get()) {
+            StepCounterService.enqueueWatchdog(applicationContext, 1000);
+        }
     }
 
     val listeners: HashMap<Int, IStepCounterService> = hashMapOf()
