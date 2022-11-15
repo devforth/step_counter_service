@@ -227,7 +227,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (isRunning.get()) {
-            StepCounterService.enqueueWatchdog(applicationContext, 1000);
+            enqueueWatchdog(applicationContext, 1000);
         }
     }
 
@@ -295,7 +295,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private val updateStepsFlow = MutableStateFlow<Int?>(null)
-    private var lastStepsValue: Int? = null;
+    private var lastStepsValue: Int? = null
 
     private fun updateStepsMessage(steps: Int): JSONObject {
         return JSONObject(mapOf("method" to "updateSteps", "args" to mapOf("steps" to steps)))
@@ -372,7 +372,10 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         notificationBuilder
             .setContentTitle(title)
             .setContentText(content)
-        notificationManager.notify(FOREGROUND_ID, notificationBuilder.build())
+
+        if (isForeground(this)) {
+            notificationManager.notify(FOREGROUND_ID, notificationBuilder.build())
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -406,7 +409,6 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                         flutterEngine?.serviceControlSurface?.onMoveToBackground()
                     }
                 }
-
             }
             "stop" -> {
                 setManuallyStopped(this, true)
