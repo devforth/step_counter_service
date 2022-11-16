@@ -13,7 +13,6 @@ import android.os.Build.VERSION.SDK_INT
 import android.os.PowerManager.WakeLock
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.core.app.AlarmManagerCompat
 import androidx.core.app.NotificationCompat
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
@@ -50,30 +49,6 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             return wakeLock!!
         }
 
-        private val WATCHDOG_REQUEST_CODE = 0x12412
-        fun enqueueWatchdog(context: Context, millis: Int = 5000) {
-            val intent = Intent(
-                context,
-                WatchdogBroadcastReceiver::class.java
-            )
-            val manager = context.getSystemService(ALARM_SERVICE) as AlarmManager
-
-            var flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if (SDK_INT >= Build.VERSION_CODES.S) {
-                flags = flags or PendingIntent.FLAG_MUTABLE
-            }
-
-            val pIntent = PendingIntent.getBroadcast(context, WATCHDOG_REQUEST_CODE, intent, flags)
-
-            // Check is background service every 5 seconds
-            AlarmManagerCompat.setAndAllowWhileIdle(
-                manager,
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + millis,
-                pIntent
-            )
-        }
-
         fun isManuallyStopped(context: Context): Boolean {
             val sharedPreferences =
                 context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
@@ -102,7 +77,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         fun isServiceRunning(context: Context): Boolean {
             return (context.getSystemService(ACTIVITY_SERVICE) as ActivityManager)
                 .getRunningServices(Integer.MAX_VALUE)
-                .any { it -> it.service.className == StepCounterService::class.java.name }
+                .any { it.service.className == StepCounterService::class.java.name }
         }
     }
 
@@ -145,17 +120,17 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             SensorManager.SENSOR_DELAY_NORMAL,
             BATCHING_5S_LATENCY
         )
-
-        startDartEntrypoint()
     }
 
     @SuppressLint("WakelockTimeout")
-    fun startDartEntrypoint() {
-        if (isRunning.get() && flutterEngine?.dartExecutor?.isExecutingDart == true) {
+    private fun startDartEntrypoint() {
+        if (isRunning.get() || (flutterEngine != null && !flutterEngine!!.dartExecutor.isExecutingDart)) {
             return
         }
 
-        getLock(applicationContext).acquire()
+        if (wakeLock == null) {
+            getLock(applicationContext).acquire()
+        }
 
         val flutterLoader = FlutterInjector.instance().flutterLoader()
         if (!flutterLoader.initialized()) {
@@ -166,7 +141,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         isRunning.set(true);
 
         flutterEngine = FlutterEngine(this)
-        flutterEngine!!.serviceControlSurface.attachToService(this@StepCounterService, null, true)
+        flutterEngine!!.serviceControlSurface.attachToService(this@StepCounterService, null, isForeground(this))
 
         methodChannel = MethodChannel(
             flutterEngine!!.dartExecutor.binaryMessenger,
@@ -188,11 +163,12 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         Log.d("StepCounterService", "onStartCommand")
 
         setManuallyStopped(this, false)
-        enqueueWatchdog(this)
+        WatchdogBroadcastReceiver.enqueue(this)
 
         if (isForeground(this)) {
             startForeground(FOREGROUND_ID, notificationBuilder.build())
         }
+        startDartEntrypoint()
 
         return START_STICKY
     }
@@ -201,7 +177,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         Log.d("StepCounterService", "onDestroy")
 
         if (!isManuallyStopped(this)) {
-            enqueueWatchdog(this)
+            WatchdogBroadcastReceiver.enqueue(this)
         }
 
         scope.cancel()
@@ -209,7 +185,6 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         notificationManager.cancel(FOREGROUND_ID)
         sensorManager.unregisterListener(this)
         stopForeground(true)
-
 
         if (flutterEngine != null) {
             flutterEngine!!.serviceControlSurface.detachFromService()
@@ -227,7 +202,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (isRunning.get()) {
-            enqueueWatchdog(applicationContext, 1000);
+            WatchdogBroadcastReceiver.enqueue(applicationContext, 1000);
         }
     }
 
@@ -242,9 +217,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
         override fun unbind(id: Int) {
             synchronized(listeners) {
-                if (listeners.containsKey(id)) {
-                    listeners.remove(id)
-                }
+                listeners.remove(id)
             }
         }
 
@@ -290,7 +263,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     }
 
     override fun onAccuracyChanged(s: Sensor?, p1: Int) {
-        Log.i("StepCounterService", "onAccuracyChanged $p1")
+        Log.d("StepCounterService", "onAccuracyChanged $p1")
     }
 
     private val scope = CoroutineScope(Dispatchers.Default)
@@ -322,7 +295,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         if (se?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
             val steps: Int? = se.values?.get(0)?.toInt()
             if (steps != null) {
-                Log.i("StepCounterService", "onSensorChanged $steps")
+                Log.d("StepCounterService", "onSensorChanged $steps")
 
                 updateStepsFlow.value = steps
             }
@@ -391,6 +364,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 val sharedPreferences =
                     getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
                 val handle: Long = sharedPreferences.getLong("on_start_handle", 0)
+
                 result.success(handle)
             }
             "setForeground" -> {
@@ -412,17 +386,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             }
             "stop" -> {
                 setManuallyStopped(this, true)
-                val intent = Intent(this, WatchdogBroadcastReceiver::class.java)
-
-                var flags = PendingIntent.FLAG_CANCEL_CURRENT
-                if (SDK_INT >= Build.VERSION_CODES.S) {
-                    flags = flags or PendingIntent.FLAG_MUTABLE
-                }
-
-                val pi =
-                    PendingIntent.getBroadcast(applicationContext, WATCHDOG_REQUEST_CODE, intent, flags)
-                val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
-                alarmManager.cancel(pi)
+                WatchdogBroadcastReceiver.cancel(this)
 
                 try {
                     synchronized(listeners) {

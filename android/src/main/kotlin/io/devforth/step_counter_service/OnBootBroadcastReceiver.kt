@@ -10,9 +10,8 @@ class OnBootBroadcastReceiver : BroadcastReceiver() {
     @SuppressLint("WakelockTimeout")
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action.equals(Intent.ACTION_BOOT_COMPLETED) || intent.action.equals("android.intent.action.QUICKBOOT_POWERON")) {
+            val sharedPreferences = context.getSharedPreferences("id.devforth.step_counter_service", Context.MODE_PRIVATE)
 
-            val sharedPreferences =
-                context.getSharedPreferences("id.devforth.step_counter_service", Context.MODE_PRIVATE)
             val startOnBoot = sharedPreferences.getBoolean("start_on_boot", true)
 
             if (startOnBoot) {
@@ -20,10 +19,13 @@ class OnBootBroadcastReceiver : BroadcastReceiver() {
                     StepCounterService.getLock(context).acquire()
                 }
 
-                ContextCompat.startForegroundService(
-                    context,
-                    Intent(context, StepCounterService::class.java)
-                )
+                val serviceIntent = Intent(context, StepCounterService::class.java)
+
+                if (StepCounterService.isForeground(context)) {
+                    ContextCompat.startForegroundService(context, serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
             }
 
         }
