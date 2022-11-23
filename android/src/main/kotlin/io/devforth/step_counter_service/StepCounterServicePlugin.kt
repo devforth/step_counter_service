@@ -5,10 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.service.ServiceAware
 import io.flutter.embedding.engine.plugins.service.ServicePluginBinding
@@ -126,9 +129,16 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                 }
             }
             "checkSensorAvailability" -> {
-                val hasStepCounterSensor: Boolean =
-                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
-                result.success(hasStepCounterSensor)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    val hasStepCounterSensorFeature: Boolean =
+                        context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
+                    val hasStepCounterSensor =
+                        ContextCompat.getSystemService(context, SensorManager::class.java)
+                            ?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null
+                    result.success(hasStepCounterSensorFeature && hasStepCounterSensor)
+                } else {
+                    result.success(false)
+                }
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isServiceRunning(context))
