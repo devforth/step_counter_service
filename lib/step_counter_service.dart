@@ -27,7 +27,7 @@ class StepCounterService implements Observable {
   void invoke(String method, [Map<String, dynamic>? args]) =>
       _platform.invoke(method, args);
 
-  Future<bool> checkSensorAvailability() => _platform.checkSensorAvailability();
+  Future<SensorAvailability> checkSensorAvailability() => _platform.checkSensorAvailability();
 
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,

@@ -6,10 +6,9 @@ import 'step_counter_service_platform_interface.dart';
 
 class MethodChannelStepCounterService extends StepCounterServicePlatform {
   @override
-  Future<bool> checkSensorAvailability() {
+  Future<SensorAvailability> checkSensorAvailability() {
     throw UnimplementedError();
   }
-
 
   @override
   Future<void> configure({required AndroidConfiguration androidConfiguration}) {
@@ -22,17 +21,7 @@ class MethodChannelStepCounterService extends StepCounterServicePlatform {
   }
 
   @override
-  Future<bool> stopService() {
-    throw UnimplementedError();
-  }
-
-  @override
   Future<bool> isServiceRunning() {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<bool> setServiceForeground(bool value) {
     throw UnimplementedError();
   }
 

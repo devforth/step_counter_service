@@ -41,6 +41,7 @@ class _MyAppState extends State<MyApp> {
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     await Permission.activityRecognition.request();
+    await service.checkSensorAvailability();
 
     await service.configure(androidConfiguration: AndroidConfiguration(
         onStart: onStart,

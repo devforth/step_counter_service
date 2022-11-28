@@ -4,9 +4,12 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -137,13 +140,19 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
             }
             "checkSensorAvailability" -> {
                 val stepCounterSensor = checkSensorAvailable(context, Sensor.TYPE_STEP_COUNTER)
-
-                val significantMotionSensor =
-                    checkSensorAvailable(context, Sensor.TYPE_SIGNIFICANT_MOTION)
                 val linearAccelerationSensor =
                     checkSensorAvailable(context, Sensor.TYPE_LINEAR_ACCELERATION)
 
-                result.success((stepCounterSensor || linearAccelerationSensor) && significantMotionSensor)
+                val significantMotionSensor =
+                    checkSensorAvailable(context, Sensor.TYPE_SIGNIFICANT_MOTION)
+
+                result.success(
+                    mapOf<String, Boolean>(
+                        "stepCounter" to stepCounterSensor,
+                        "linearAcceleration" to linearAccelerationSensor,
+                        "significantMotion" to significantMotionSensor
+                    )
+                )
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isServiceRunning(context))

@@ -49,9 +49,15 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
-  Future<bool> checkSensorAvailability() async {
-    bool? result = await _channel.invokeMethod("checkSensorAvailability");
-    return result ?? false;
+  Future<SensorAvailability> checkSensorAvailability() async {
+    Map<String, dynamic> result =
+        await _channel.invokeMethod("checkSensorAvailability") ??
+            <String, dynamic>{};
+
+    return SensorAvailability(
+        stepCounterSensor: (result["stepCounter"] as bool),
+        linearAccelerationSensor: (result["linearAcceleration"] as bool),
+        significantMotionSensor: (result["significantMotion"] as bool));
   }
 
   @override
@@ -64,6 +70,12 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
 
     if (handle == null) {
       throw 'onStart method must be a top-level or static function';
+    }
+
+    var sensorAvailability = await checkSensorAvailability();
+
+    if ((!sensorAvailability.stepCounterSensor && !sensorAvailability.linearAccelerationSensor) || !sensorAvailability.significantMotionSensor) {
+      throw 'Device does not have required sensors for step counting';
     }
 
     await _channel.invokeMethod(
@@ -157,13 +169,11 @@ class AndroidServiceInstance extends ServiceInstance {
 
   @override
   Stream<int> onUpdateSteps() => on("updateSteps")
-      .transform(StreamTransformer.fromHandlers(
-      handleData: (data, sink) {
+          .transform(StreamTransformer.fromHandlers(handleData: (data, sink) {
         if (data?['steps'] != null) {
           sink.add(data!['steps']!);
         }
-      }
-  ));
+      }));
 
   @override
   Future<void> stop() async {
@@ -183,6 +193,6 @@ class AndroidServiceInstance extends ServiceInstance {
 
   @override
   Future<void> setForeground(bool value) async {
-    await _channel.invokeMethod("setForeground", { "value": value });
+    await _channel.invokeMethod("setForeground", {"value": value});
   }
 }
