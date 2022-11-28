@@ -4,9 +4,8 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.*
 import android.os.Build.VERSION.SDK_INT
@@ -14,6 +13,8 @@ import android.os.PowerManager.WakeLock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import io.devforth.step_counter_service.sensors.*
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor.DartEntrypoint
@@ -21,18 +22,19 @@ import io.flutter.plugin.common.JSONMethodCodec
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.debounce
 import org.json.JSONObject
+import java.util.Timer
+import java.util.TimerTask
 import java.util.concurrent.atomic.AtomicBoolean
 
+private const val FOREGROUND_ID = 0x41241
+private const val NOTIFICATION_CHANNEL_ID = "id.devforth/STEP_COUNTER_SERVICE_NOTIFICATION_ID"
 
-@OptIn(FlowPreview::class)
-class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodCallHandler {
+private const val DEBUG_USE_ACCELEROMETER = false
+
+class StepCounterService : Service(), StepCountingSensorListener, SignificantMotionSensorListener,
+    MethodChannel.MethodCallHandler {
     companion object {
-        val isRunning: AtomicBoolean = AtomicBoolean(false)
-
         @Volatile
         var wakeLock: WakeLock? = null
 
@@ -49,30 +51,6 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             return wakeLock!!
         }
 
-        fun isManuallyStopped(context: Context): Boolean {
-            val sharedPreferences =
-                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
-            return sharedPreferences.getBoolean("is_manually_stopped", false)
-        }
-
-        fun setManuallyStopped(context: Context, value: Boolean) {
-            val sharedPreferences =
-                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
-            sharedPreferences.edit().putBoolean("is_manually_stopped", value).apply()
-        }
-
-        fun isForeground(context: Context): Boolean {
-            val sharedPreferences =
-                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
-            return sharedPreferences.getBoolean("foreground", false)
-        }
-
-        fun setForeground(context: Context, value: Boolean) {
-            val sharedPreferences =
-                context.getSharedPreferences("id.devforth.step_counter_service", MODE_PRIVATE)
-            return sharedPreferences.edit().putBoolean("foreground", value).apply()
-        }
-
         @Suppress("DEPRECATION")
         fun isServiceRunning(context: Context): Boolean {
             return (context.getSystemService(ACTIVITY_SERVICE) as ActivityManager)
@@ -81,28 +59,106 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         }
     }
 
+    class Config(private val context: Context) {
+        private val sharedPreferences: SharedPreferences
+            get() {
+                return context.getSharedPreferences(
+                    "id.devforth.step_counter_service",
+                    MODE_PRIVATE
+                )
+            }
+
+        var isManuallyStopped: Boolean
+            get() {
+                return sharedPreferences.getBoolean("is_manually_stopped", false)
+            }
+            set(value) {
+                sharedPreferences.edit().putBoolean("is_manually_stopped", value).apply()
+            }
+
+        var isForeground: Boolean
+            get() {
+                return sharedPreferences.getBoolean("foreground", false)
+            }
+            set(value) {
+                sharedPreferences.edit().putBoolean("foreground", value).apply()
+            }
+    }
+
+    private val isRunning: AtomicBoolean = AtomicBoolean(false)
+
     private lateinit var handler: Handler
 
-    private val FOREGROUND_ID = 0x41241
-    private val NOTIFICATION_CHANNEL_ID = "id.devforth/STEP_COUNTER_SERVICE_NOTIFICATION_ID"
-
-    private val BATCHING_0S_LATENCY = 0
-    private val BATCHING_5S_LATENCY = 5000000
-
     private lateinit var notificationManager: NotificationManager
-    private lateinit var sensorManager: SensorManager
-
     private lateinit var notificationBuilder: NotificationCompat.Builder
-    private lateinit var stepCounterSensor: Sensor
+
+    private lateinit var stepCountingSensor: StepCountingSensor
+    private lateinit var significantMotionSensor: SignificantMotionSensor
 
     private var flutterEngine: FlutterEngine? = null
     private var methodChannel: MethodChannel? = null
     private var dartEntrypoint: DartEntrypoint? = null
 
-    @RequiresApi(Build.VERSION_CODES.KITKAT)
-    override fun onCreate() {
-        super.onCreate();
+    private var currentStepCount: Int? = null
 
+    private var noMotionTimer: Timer? = null
+    private var syncStepsTimer: Timer? = null
+
+    private fun noMotionTimerTask(): TimerTask {
+        return object : TimerTask() {
+            override fun run() {
+                Log.d("StepCounterService", "NoMotion TimerTask")
+                handler.post {
+                    stepCountingSensor.stop()
+                    significantMotionSensor.start()
+
+                    this@StepCounterService.syncStepsTimer?.cancel()
+
+                    wakeLock?.release()
+                    wakeLock = null
+                }
+            }
+        }
+    }
+
+    private fun rescheduleNoMotionTimer() {
+        this.noMotionTimer?.cancel()
+        this.noMotionTimer = Timer("NoMotionTimer", false)
+        this.noMotionTimer?.schedule(noMotionTimerTask(), 1 * 60 * 1000)
+    }
+
+    private fun syncStepsTimerTask(): TimerTask {
+        return object : TimerTask() {
+            private var lastSentStepCount: Int? = null
+
+            override fun run() {
+                handler.post {
+                    if (currentStepCount == null) return@post
+
+                    if (lastSentStepCount != currentStepCount) {
+                        Log.d("StepCounterService", "SyncSteps TimerTask: $currentStepCount")
+                        lastSentStepCount = currentStepCount
+                        rescheduleNoMotionTimer()
+
+                        val data = updateStepsMessage(currentStepCount!!).toString()
+
+                        this@StepCounterService.invoke(data)
+                        this@StepCounterService.binder.invoke(data)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun rescheduleSyncStepsTimer() {
+        this.syncStepsTimer?.cancel()
+        this.syncStepsTimer = Timer("SyncStepsTimer", false)
+        this.syncStepsTimer?.scheduleAtFixedRate(syncStepsTimerTask(), 1000, 10 * 1000)
+    }
+
+
+    override fun onCreate() {
+        super.onCreate()
         Log.d("StepCounterService", "onCreate")
 
         handler = Handler(Looper.getMainLooper())
@@ -111,15 +167,19 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         createNotificationChannel()
         createNotification()
 
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        val stepCounterSensorAvailable = checkSensorAvailable(this, Sensor.TYPE_STEP_COUNTER)
+        stepCountingSensor =
+            if (stepCounterSensorAvailable && !DEBUG_USE_ACCELEROMETER) StepCounterSensor(this)
+            else AccelerometerStepCountingSensor(this)
+        significantMotionSensor = SignificantMotionSensor(this)
 
-        sensorManager.registerListener(
-            this,
-            stepCounterSensor,
-            SensorManager.SENSOR_DELAY_NORMAL,
-            BATCHING_5S_LATENCY
-        )
+        stepCountingSensor.registerListener(this)
+        significantMotionSensor.registerListener(this)
+
+        stepCountingSensor.start()
+
+        rescheduleNoMotionTimer()
+        rescheduleSyncStepsTimer()
     }
 
     @SuppressLint("WakelockTimeout")
@@ -129,19 +189,23 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
         }
 
         if (wakeLock == null) {
-            getLock(applicationContext).acquire()
+            getLock(this).acquire()
         }
 
         val flutterLoader = FlutterInjector.instance().flutterLoader()
         if (!flutterLoader.initialized()) {
-            flutterLoader.startInitialization(applicationContext)
+            flutterLoader.startInitialization(this)
         }
 
-        flutterLoader.ensureInitializationComplete(applicationContext, null)
-        isRunning.set(true);
+        flutterLoader.ensureInitializationComplete(this, null)
+        isRunning.set(true)
 
         flutterEngine = FlutterEngine(this)
-        flutterEngine!!.serviceControlSurface.attachToService(this@StepCounterService, null, isForeground(this))
+        flutterEngine!!.serviceControlSurface.attachToService(
+            this@StepCounterService,
+            null,
+            Config(this).isForeground
+        )
 
         methodChannel = MethodChannel(
             flutterEngine!!.dartExecutor.binaryMessenger,
@@ -159,13 +223,13 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        super.onStartCommand(intent, flags, startId)
         Log.d("StepCounterService", "onStartCommand")
 
-        setManuallyStopped(this, false)
+        val config = Config(this)
+        config.isManuallyStopped = false
         WatchdogBroadcastReceiver.enqueue(this)
 
-        if (isForeground(this)) {
+        if (config.isForeground) {
             startForeground(FOREGROUND_ID, notificationBuilder.build())
         }
         startDartEntrypoint()
@@ -176,15 +240,18 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
     override fun onDestroy() {
         Log.d("StepCounterService", "onDestroy")
 
-        if (!isManuallyStopped(this)) {
-            WatchdogBroadcastReceiver.enqueue(this)
+        if (!Config(this).isManuallyStopped) {
+            WatchdogBroadcastReceiver.enqueue(this, 1000)
         }
 
-        scope.cancel()
+        this.noMotionTimer?.cancel()
+        this.syncStepsTimer?.cancel()
 
         notificationManager.cancel(FOREGROUND_ID)
-        sensorManager.unregisterListener(this)
         stopForeground(true)
+
+        stepCountingSensor.stop()
+        significantMotionSensor.stop()
 
         if (flutterEngine != null) {
             flutterEngine!!.serviceControlSurface.detachFromService()
@@ -202,104 +269,82 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (isRunning.get()) {
-            WatchdogBroadcastReceiver.enqueue(applicationContext, 1000);
+            WatchdogBroadcastReceiver.enqueue(applicationContext, 1000)
         }
     }
 
     val listeners: HashMap<Int, IStepCounterService> = hashMapOf()
-    private val binder: IStepCounterServiceBinder.Stub = object : IStepCounterServiceBinder.Stub() {
-        override fun bind(id: Int, service: IStepCounterService?) {
-            synchronized(listeners) {
-                listeners[id] = service!!
+    private val binder: IStepCounterServiceBinder.Stub =
+        object : IStepCounterServiceBinder.Stub() {
+            override fun bind(id: Int, service: IStepCounterService?) {
+                synchronized(listeners) {
+                    listeners[id] = service!!
+                }
+                currentStepCount?.let { service!!.invoke(updateStepsMessage(it).toString()) }
             }
-            lastStepsValue?.let { service!!.invoke(updateStepsMessage(it).toString()) }
-        }
 
-        override fun unbind(id: Int) {
-            synchronized(listeners) {
-                listeners.remove(id)
-            }
-        }
-
-        override fun invoke(data: String) {
-            if (methodChannel != null) {
-                try {
-                    handler.post {
-                        methodChannel!!.invokeMethod(
-                            "onMessage",
-                            JSONObject(data)
-                        )
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+            override fun unbind(id: Int) {
+                synchronized(listeners) {
+                    listeners.remove(id)
                 }
             }
-        }
 
-        override fun invokeInternal(method: String, data: String?) {
-            Log.d("Binder", "invokeInternal")
-            this@StepCounterService.onMethodCall(MethodCall(method, data?.let { JSONObject(it) }), object : MethodChannel.Result {
-                override fun success(result: Any?) {}
-                override fun notImplemented() {}
-                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {}
-            })
+            override fun invoke(data: String) {
+                if (methodChannel != null) {
+                    try {
+                        handler.post {
+                            methodChannel!!.invokeMethod(
+                                "onMessage",
+                                JSONObject(data)
+                            )
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            override fun invokeInternal(method: String, data: String?) {
+                Log.d("Binder", "invokeInternal")
+                this@StepCounterService.onMethodCall(
+                    MethodCall(method, data?.let { JSONObject(it) }),
+                    object : MethodChannel.Result {
+                        override fun success(result: Any?) {}
+                        override fun notImplemented() {}
+                        override fun error(
+                            errorCode: String,
+                            errorMessage: String?,
+                            errorDetails: Any?
+                        ) {
+                        }
+                    })
+            }
         }
-    }
 
     override fun onBind(intent: Intent): IBinder {
-        lastStepsValue?.let { binder.invoke(updateStepsMessage(it).toString()) }
+        currentStepCount?.let { binder.invoke(updateStepsMessage(it).toString()) }
         return binder
     }
 
     override fun onUnbind(intent: Intent): Boolean {
-        val binderId = intent.getIntExtra("binder_id", 0);
+        val binderId = intent.getIntExtra("binder_id", 0)
         if (binderId != 0) {
             synchronized(listeners) {
-                listeners.remove(binderId);
+                listeners.remove(binderId)
             }
         }
 
         return super.onUnbind(intent)
     }
 
-    override fun onAccuracyChanged(s: Sensor?, p1: Int) {
-        Log.d("StepCounterService", "onAccuracyChanged $p1")
-    }
-
-    private val scope = CoroutineScope(Dispatchers.Default)
-    private val updateStepsFlow = MutableStateFlow<Int?>(null)
-    private var lastStepsValue: Int? = null
 
     private fun updateStepsMessage(steps: Int): JSONObject {
         return JSONObject(mapOf("method" to "updateSteps", "args" to mapOf("steps" to steps)))
     }
 
-    init {
-        scope.launch {
-            updateStepsFlow.debounce(1000).collect {
-                if (it == null) return@collect
-
-                Log.d("StepCounterService", "GOT IT $it")
-
-                val data = updateStepsMessage(it).toString()
-
-                lastStepsValue = it;
-
-                this@StepCounterService.invoke(data)
-                this@StepCounterService.binder.invoke(data)
-            }
-        }
-    }
-
-    override fun onSensorChanged(se: SensorEvent?) {
-        if (se?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
-            val steps: Int? = se.values?.get(0)?.toInt()
-            if (steps != null) {
-                Log.d("StepCounterService", "onSensorChanged $steps")
-
-                updateStepsFlow.value = steps
-            }
-        }
+    override fun onStepCountChanged(stepCount: Int) {
+        Log.d("StepCounterService", "onStepTaken $stepCount")
+        currentStepCount = stepCount
     }
 
     private fun createNotificationChannel() {
@@ -323,31 +368,35 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             flags = flags or PendingIntent.FLAG_MUTABLE
         }
 
-        val contentIntent = PendingIntent.getActivity(this@StepCounterService, 11, intent, flags)
+        val contentIntent =
+            PendingIntent.getActivity(this@StepCounterService, 11, intent, flags)
 
         val sharedPreferences =
             getSharedPreferences("id.devforth.step_counter_service", Context.MODE_PRIVATE)
         val notificationTitle =
-            sharedPreferences.getString("default_notification_title", "Step Counter Service");
+            sharedPreferences.getString("default_notification_title", "Step Counter Service")
         val notificationContent =
-            sharedPreferences.getString("default_notification_content", "Preparing...");
+            sharedPreferences.getString("default_notification_content", "Preparing...")
 
-        notificationBuilder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_bg_service_small)
-            .setContentTitle(notificationTitle)
-            .setContentText(notificationContent)
-            .setOngoing(true)
-            .setSilent(true)
-            .setContentIntent(contentIntent)
+        notificationBuilder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID).apply {
+            setSmallIcon(R.drawable.ic_bg_service_small)
+            setContentTitle(notificationTitle)
+            setContentText(notificationContent)
+            setOngoing(true)
+            setSilent(true)
+            setContentIntent(contentIntent)
+        }
     }
 
     private fun updateNotification(title: String, content: String) {
-        notificationBuilder
-            .setContentTitle(title)
-            .setContentText(content)
+        notificationBuilder.apply {
+            setContentTitle(title)
+            setContentText(content)
+        }
 
-        if (isForeground(this)) {
-            notificationManager.notify(FOREGROUND_ID, notificationBuilder.build())
+        if (Config(this).isForeground) {
+//            notificationManager.notify(FOREGROUND_ID, notificationBuilder.build())
+            startForeground(FOREGROUND_ID, notificationBuilder.build())
         }
     }
 
@@ -371,8 +420,8 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 val arg = call.arguments as JSONObject
                 val value = arg.getBoolean("value")
 
-                val currentValue = isForeground(this)
-                setForeground(this, value)
+                val currentValue = Config(this).isForeground
+                Config(this).isForeground = value
 
                 if (currentValue != value) {
                     if (value) {
@@ -385,7 +434,7 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
                 }
             }
             "stop" -> {
-                setManuallyStopped(this, true)
+                Config(this).isManuallyStopped = true
                 WatchdogBroadcastReceiver.cancel(this)
 
                 try {
@@ -420,4 +469,22 @@ class StepCounterService : Service(), SensorEventListener, MethodChannel.MethodC
             }
         }
     }
+
+    @SuppressLint("WakelockTimeout")
+    override fun onSignificantMotion() {
+        Log.d("StepCounterService", "OnSignificantMotionDetected")
+        if (wakeLock == null) {
+            getLock(this).acquire()
+        }
+
+        // Restart timer since user is moving
+        rescheduleNoMotionTimer()
+        rescheduleSyncStepsTimer()
+        stepCountingSensor.start()
+    }
+}
+
+fun checkSensorAvailable(context: Context, sensorType: Int): Boolean {
+    return ContextCompat.getSystemService(context, SensorManager::class.java)
+        ?.getDefaultSensor(sensorType) != null
 }

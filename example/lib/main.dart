@@ -16,16 +16,8 @@ void main() {
 @pragma("vm:entry-point")
 void onStart(ServiceInstance serviceInstance) {
   serviceInstance.onUpdateSteps().listen((steps) {
-    print("BG GOT STEPS $steps");
+    print("FLUTTER BG GOT STEPS $steps");
     serviceInstance.updateNotification(title: "Example Title BG", content: "Example Content. Steps: $steps");
-  });
-
-  bool value = true;
-
-  serviceInstance.on('setForeground').listen((event) {
-    print(event?['value'].runtimeType);
-    value = !value;
-    serviceInstance.setForeground(value);
   });
 }
 
@@ -56,9 +48,10 @@ class _MyAppState extends State<MyApp> {
         defaultNotificationTitle: "Example Title",
         defaultNotificationContent: "Example Content",
     ));
+    await service.startService();
 
     service.onUpdateSteps().listen((steps) {
-      print("MAIN GOT STEPS $steps");
+      print("FLUTTER MAIN GOT STEPS $steps");
       setState(() {
         _stepCount = steps;
       });
@@ -81,7 +74,7 @@ class _MyAppState extends State<MyApp> {
           child: GestureDetector(
             child: Text('Step count: $_stepCount\n'),
             onTap: () => {
-              service.invoke('setForeground', { 'value': false })
+              // service.invoke('setForeground', { 'value': false })
             },
           ),
         ),

@@ -11,7 +11,6 @@
         <service
             android:name=".StepCounterService"
             android:enabled="true"
-            android:exported="true"
             android:stopWithTask="false" />
 
         <receiver
@@ -26,8 +25,7 @@
 
         <receiver
             android:name=".WatchdogBroadcastReceiver"
-            android:enabled="true"
-            android:exported="true" />
+            android:enabled="true" />
 
     </application>
 </manifest>

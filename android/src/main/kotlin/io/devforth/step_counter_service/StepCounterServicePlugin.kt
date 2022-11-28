@@ -1,9 +1,6 @@
 package io.devforth.step_counter_service
 
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
@@ -78,7 +75,11 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
         handler = Handler(context.mainLooper)
 
         channel =
-            MethodChannel(flutterPluginBinding.binaryMessenger, "id.devforth/step_counter_service", JSONMethodCodec.INSTANCE)
+            MethodChannel(
+                flutterPluginBinding.binaryMessenger,
+                "id.devforth/step_counter_service",
+                JSONMethodCodec.INSTANCE
+            )
         channel.setMethodCallHandler(this)
     }
 
@@ -90,7 +91,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
         intent.putExtra("binder_id", serviceBinderId);
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && StepCounterService.isForeground(context)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && StepCounterService.Config(context).isForeground) {
             context.startForegroundService(intent)
         } else {
             context.startService(intent)
@@ -100,24 +101,30 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        Log.d("SCSPlugin", "onMethodCall")
+        Log.d("SCSPlugin", "onMethodCall ${call.method}")
 
         when (call.method) {
             "configure" -> {
                 val arg = call.arguments as JSONObject
 
-                val preferences = context.getSharedPreferences("id.devforth.step_counter_service", Context.MODE_PRIVATE)
+                val preferences = context.getSharedPreferences(
+                    "id.devforth.step_counter_service",
+                    Context.MODE_PRIVATE
+                )
                 preferences.edit()
                     .putLong("on_start_handle", arg.getLong("on_start_handle"))
                     .putBoolean("start_on_boot", arg.getBoolean("start_on_boot"))
                     .putBoolean("foreground", arg.getBoolean("foreground"))
-                    .putString("default_notification_title", arg.getString("default_notification_title"))
-                    .putString("default_notification_content", arg.getString("default_notification_content"))
+                    .putString(
+                        "default_notification_title",
+                        arg.getString("default_notification_title")
+                    )
+                    .putString(
+                        "default_notification_content",
+                        arg.getString("default_notification_content")
+                    )
                     .apply()
 
-                if (arg.getBoolean("start_on_boot")) {
-                    startService()
-                }
                 result.success(null)
             }
             "startService" -> {
@@ -129,16 +136,14 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                 }
             }
             "checkSensorAvailability" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    val hasStepCounterSensorFeature: Boolean =
-                        context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER)
-                    val hasStepCounterSensor =
-                        ContextCompat.getSystemService(context, SensorManager::class.java)
-                            ?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null
-                    result.success(hasStepCounterSensorFeature && hasStepCounterSensor)
-                } else {
-                    result.success(false)
-                }
+                val stepCounterSensor = checkSensorAvailable(context, Sensor.TYPE_STEP_COUNTER)
+
+                val significantMotionSensor =
+                    checkSensorAvailable(context, Sensor.TYPE_SIGNIFICANT_MOTION)
+                val linearAccelerationSensor =
+                    checkSensorAvailable(context, Sensor.TYPE_LINEAR_ACCELERATION)
+
+                result.success((stepCounterSensor || linearAccelerationSensor) && significantMotionSensor)
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isServiceRunning(context))
