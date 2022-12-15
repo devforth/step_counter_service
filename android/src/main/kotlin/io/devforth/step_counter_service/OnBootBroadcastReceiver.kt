@@ -1,9 +1,11 @@
 package io.devforth.step_counter_service
 
 import android.annotation.SuppressLint
+import android.app.ForegroundServiceStartNotAllowedException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 
@@ -26,12 +28,22 @@ class OnBootBroadcastReceiver : BroadcastReceiver() {
 
                 val config = StepCounterService.Config(context)
                 if (config.isForeground) {
-                    ContextCompat.startForegroundService(context, serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } catch (e: Exception) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e::class.java == ForegroundServiceStartNotAllowedException::class.java) {
+                            Log.e("OnBootBR", "Got ForegroundServiceStartNotAllowedException")
+                            Log.e("OnBootBR", e.stackTraceToString())
+                        } else {
+                            throw e
+                        }
+                    }
                 }
             }
-
         }
     }
 }

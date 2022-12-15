@@ -293,7 +293,7 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
                 if (methodChannel != null) {
                     try {
                         handler.post {
-                            methodChannel!!.invokeMethod(
+                            methodChannel?.invokeMethod(
                                 "onMessage",
                                 JSONObject(data)
                             )

@@ -2,6 +2,8 @@ package io.devforth.step_counter_service
 
 import android.annotation.SuppressLint
 import android.app.AlarmManager
+import android.app.BackgroundServiceStartNotAllowedException
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -70,10 +72,25 @@ class WatchdogBroadcastReceiver : BroadcastReceiver() {
             val config = StepCounterService.Config(context)
             val serviceIntent = Intent(context, StepCounterService::class.java)
             if (!config.isManuallyStopped) {
-                if (config.isForeground) {
-                    ContextCompat.startForegroundService(context, serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
+                try {
+                    if (config.isForeground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
+                } catch (e: Exception) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (e::class.java == ForegroundServiceStartNotAllowedException::class.java) {
+                            Log.e("OnBootBR", "Got ForegroundServiceStartNotAllowedException")
+                            Log.e("OnBootBR", e.stackTraceToString())
+                        }
+                        else if (e::class.java == BackgroundServiceStartNotAllowedException::class.java) {
+                            Log.e("OnBootBR", "Got BackgroundServiceStartNotAllowedException")
+                            Log.e("OnBootBR", e.stackTraceToString())
+                        }
+                    } else {
+                        throw e
+                    }
                 }
             }
         }
