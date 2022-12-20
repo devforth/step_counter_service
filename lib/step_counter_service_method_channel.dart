@@ -6,11 +6,6 @@ import 'step_counter_service_platform_interface.dart';
 
 class MethodChannelStepCounterService extends StepCounterServicePlatform {
   @override
-  Future<SensorAvailability> checkSensorAvailability() {
-    throw UnimplementedError();
-  }
-
-  @override
   Future<void> configure({required AndroidConfiguration androidConfiguration}) {
     throw UnimplementedError();
   }

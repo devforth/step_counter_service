@@ -7,8 +7,8 @@ import androidx.core.content.ContextCompat
 
 abstract class ListenableSensor<T>(
     context: Context,
-    sensorType: Int,
-    private val oneShot: Boolean = false
+    private val sensorType: Int,
+    protected val oneShot: Boolean = false
 ) : TriggerEventListener(), SensorEventListener {
     private val sensorManager: SensorManager = ContextCompat.getSystemService(
         context,
@@ -31,26 +31,30 @@ abstract class ListenableSensor<T>(
     }
 
     open fun start() {
-        if (oneShot) {
+        if (isOneShotSensor()) {
             sensorManager.requestTriggerSensor(this, sensor)
         } else {
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
         }
     }
 
-    fun stop() {
-        if (oneShot) {
+    open fun stop() {
+        if (isOneShotSensor()) {
             sensorManager.cancelTriggerSensor(this, sensor)
         } else {
             sensorManager.unregisterListener(this)
         }
     }
 
-    override fun onTrigger(event: TriggerEvent?) {
+    private fun isOneShotSensor(): Boolean {
+        return sensorType == Sensor.TYPE_SIGNIFICANT_MOTION
+    }
+
+    override fun onTrigger(event: TriggerEvent) {
         TODO("Not yet implemented")
     }
 
-    override fun onSensorChanged(event: SensorEvent?) {
+    override fun onSensorChanged(event: SensorEvent) {
         TODO("Not yet implemented")
     }
 

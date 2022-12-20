@@ -28,8 +28,6 @@ abstract class StepCounterServicePlatform extends PlatformInterface
     _instance = instance;
   }
 
-  Future<SensorAvailability> checkSensorAvailability();
-
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,
   });
@@ -57,14 +55,12 @@ abstract class ServiceInstance implements Observable {
   Future<void> setForeground(bool value);
 }
 
-class SensorAvailability {
-  final bool stepCounterSensor;
-  final bool linearAccelerationSensor;
-  final bool significantMotionSensor;
+class ServiceStatus {
+  final String? stepCounter;
+  final String? motionDetector;
 
-  SensorAvailability({
-    required this.stepCounterSensor,
-    required this.linearAccelerationSensor,
-    required this.significantMotionSensor,
+  ServiceStatus({
+    required this.stepCounter,
+    required this.motionDetector,
   });
 }

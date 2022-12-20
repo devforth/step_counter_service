@@ -88,8 +88,6 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
 
 
     private fun startService() {
-        WatchdogBroadcastReceiver.enqueue(context)
-
         val intent = Intent(context, StepCounterService::class.java)
         intent.putExtra("binder_id", serviceBinderId);
 
@@ -100,7 +98,8 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
             context.startService(intent)
         }
 
-        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        WatchdogBroadcastReceiver.enqueue(context)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -137,22 +136,6 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
                 } catch (e: java.lang.Exception) {
                     result.error("start_service_error", e.message, null)
                 }
-            }
-            "checkSensorAvailability" -> {
-                val stepCounterSensor = checkSensorAvailable(context, Sensor.TYPE_STEP_COUNTER)
-                val linearAccelerationSensor =
-                    checkSensorAvailable(context, Sensor.TYPE_LINEAR_ACCELERATION)
-
-                val significantMotionSensor =
-                    checkSensorAvailable(context, Sensor.TYPE_SIGNIFICANT_MOTION)
-
-                result.success(
-                    mapOf<String, Boolean>(
-                        "stepCounter" to stepCounterSensor,
-                        "linearAcceleration" to linearAccelerationSensor,
-                        "significantMotion" to significantMotionSensor
-                    )
-                )
             }
             "isServiceRunning" -> {
                 result.success(StepCounterService.isServiceRunning(context))

@@ -1,19 +1,18 @@
-package io.devforth.step_counter_service.sensors
+package io.devforth.step_counter_service.sensors.step
 
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.os.SystemClock
 import android.util.Log
-import java.io.OutputStreamWriter
 import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.properties.Delegates
 
-private const val PEAK_THRESHOLD = 0.75
+private const val PEAK_THRESHOLD = 3f
 
-class AccelerometerStepCountingSensor(private val context: Context) :
-    StepCountingSensor(Sensor.TYPE_LINEAR_ACCELERATION, context) {
+class AccelerometerStepDetector(private val context: Context) :
+    StepCounter(Sensor.TYPE_LINEAR_ACCELERATION, context) {
 
     private val sharedPreferences = context.getSharedPreferences("id.devforth.step_counter_service.accelerometer", Context.MODE_PRIVATE)
 
@@ -77,6 +76,7 @@ class AccelerometerStepCountingSensor(private val context: Context) :
 
         // Peak detection
         if (startVector[1] > startVector[0] && startVector[1] > startVector[2]) {
+//            Log.d("AccelerometerSCS", "Current value ${startVector[1]}")
             if (startVector[1] < PEAK_THRESHOLD) {
 //                Log.d("AccelerometerSCS", "Peak too small ${startVector[1]}")
                 return currentStepCount
@@ -100,12 +100,12 @@ class AccelerometerStepCountingSensor(private val context: Context) :
             lastPeakDiff = peakDiff
 
             if (lastPeakTime > 0) {
-                // Discard peaks that are faster than 160bmp and slower than 20bpm
+                // Discard peaks that are faster than 160bmp and slower than 30bpm
                 val peakDelta = event.timestamp - lastPeakTime
 
                 if (peakDelta < 60 * 1e9 / 160) {
                     Log.d("AccelerometerSCS", "Too fast ${peakDelta / 1e9}")
-                } else if (peakDelta > 60 * 1e9 / 20) {
+                } else if (peakDelta > 60 * 1e9 / 30) {
                     Log.d("AccelerometerSCS", "Too slow ${peakDelta / 1e9}")
                 }
 

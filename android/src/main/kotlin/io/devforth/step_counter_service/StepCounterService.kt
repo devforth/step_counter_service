@@ -5,16 +5,16 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.hardware.Sensor
-import android.hardware.SensorManager
 import android.os.*
 import android.os.Build.VERSION.SDK_INT
 import android.os.PowerManager.WakeLock
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import io.devforth.step_counter_service.sensors.*
+import io.devforth.step_counter_service.sensors.motion.MotionDetector
+import io.devforth.step_counter_service.sensors.motion.MotionDetectorLister
+import io.devforth.step_counter_service.sensors.step.StepCounter
+import io.devforth.step_counter_service.sensors.step.StepCountingSensorListener
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor.DartEntrypoint
@@ -30,9 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 private const val FOREGROUND_ID = 0x41241
 private const val NOTIFICATION_CHANNEL_ID = "id.devforth/STEP_COUNTER_SERVICE_NOTIFICATION_ID"
 
-private const val DEBUG_USE_ACCELEROMETER = false
-
-class StepCounterService : Service(), StepCountingSensorListener, SignificantMotionSensorListener,
+class StepCounterService : Service(), StepCountingSensorListener, MotionDetectorLister,
     MethodChannel.MethodCallHandler {
     companion object {
         @Volatile
@@ -92,8 +90,8 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationBuilder: NotificationCompat.Builder
 
-    private lateinit var stepCountingSensor: StepCountingSensor
-    private lateinit var significantMotionSensor: SignificantMotionSensor
+    private var stepCounter: StepCounter? = null
+    private var motionDetector: MotionDetector? = null
 
     private var flutterEngine: FlutterEngine? = null
     private var methodChannel: MethodChannel? = null
@@ -109,8 +107,8 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
             override fun run() {
                 Log.d("StepCounterService", "NoMotion TimerTask")
                 handler.post {
-                    stepCountingSensor.stop()
-                    significantMotionSensor.start()
+                    stepCounter?.stop()
+                    motionDetector?.start()
 
                     this@StepCounterService.syncStepsTimer?.cancel()
 
@@ -122,9 +120,12 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
     }
 
     private fun rescheduleNoMotionTimer() {
+        // If motion detector is not present, we do not try to optimize use of the wake lock, since it's very unreliable or has no impact on battery usage to use something else
+        if (this.motionDetector == null) return
+
         this.noMotionTimer?.cancel()
         this.noMotionTimer = Timer("NoMotionTimer", false)
-        this.noMotionTimer?.schedule(noMotionTimerTask(), 1 * 60 * 1000)
+        this.noMotionTimer?.schedule(noMotionTimerTask(), 5 * 60 * 1000)
     }
 
     private fun syncStepsTimerTask(): TimerTask {
@@ -167,16 +168,13 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
         createNotificationChannel()
         createNotification()
 
-        val stepCounterSensorAvailable = checkSensorAvailable(this, Sensor.TYPE_STEP_COUNTER)
-        stepCountingSensor =
-            if (stepCounterSensorAvailable && !DEBUG_USE_ACCELEROMETER) StepCounterSensor(this)
-            else AccelerometerStepCountingSensor(this)
-        significantMotionSensor = SignificantMotionSensor(this)
+        stepCounter = StepCounter.getBest(this)
+        motionDetector = MotionDetector.getBest(this)
 
-        stepCountingSensor.registerListener(this)
-        significantMotionSensor.registerListener(this)
+        stepCounter?.registerListener(this)
+        motionDetector?.registerListener(this)
 
-        stepCountingSensor.start()
+        stepCounter?.start()
 
         rescheduleNoMotionTimer()
         rescheduleSyncStepsTimer()
@@ -227,6 +225,12 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
 
         val config = Config(this)
         config.isManuallyStopped = false
+
+        // Step counting is not supported, no point in starting watchdog\flutter part of the service
+        if (this.stepCounter == null) {
+            return START_STICKY
+        }
+
         WatchdogBroadcastReceiver.enqueue(this)
 
         if (config.isForeground) {
@@ -250,8 +254,8 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
         notificationManager.cancel(FOREGROUND_ID)
         stopForeground(true)
 
-        stepCountingSensor.stop()
-        significantMotionSensor.stop()
+        stepCounter?.stop()
+        motionDetector?.stop()
 
         if (flutterEngine != null) {
             flutterEngine!!.serviceControlSurface.detachFromService()
@@ -281,6 +285,7 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
                     listeners[id] = service!!
                 }
                 currentStepCount?.let { service!!.invoke(updateStepsMessage(it).toString()) }
+                service!!.invoke(serviceStatusMessage().toString())
             }
 
             override fun unbind(id: Int) {
@@ -315,14 +320,13 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
                             errorCode: String,
                             errorMessage: String?,
                             errorDetails: Any?
-                        ) {
-                        }
-                    })
+                        ) {}
+                    }
+                )
             }
         }
 
     override fun onBind(intent: Intent): IBinder {
-        currentStepCount?.let { binder.invoke(updateStepsMessage(it).toString()) }
         return binder
     }
 
@@ -339,7 +343,19 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
 
 
     private fun updateStepsMessage(steps: Int): JSONObject {
-        return JSONObject(mapOf("method" to "updateSteps", "args" to mapOf("steps" to steps)))
+        return JSONObject(mapOf("method" to "updateSteps", "args" to JSONObject(mapOf("steps" to steps))))
+    }
+
+    private fun serviceStatusMessage(): JSONObject {
+        return JSONObject(
+            mapOf(
+                "method" to "serviceStatus",
+                "args" to JSONObject(mapOf(
+                    "stepCounter" to if(this.stepCounter != null) this.stepCounter!!::class.java.simpleName else null,
+                    "motionDetector" to if(this.motionDetector != null) this.motionDetector!!::class.java.simpleName else null,
+                ))
+            )
+        )
     }
 
     override fun onStepCountChanged(stepCount: Int) {
@@ -471,8 +487,8 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
     }
 
     @SuppressLint("WakelockTimeout")
-    override fun onSignificantMotion() {
-        Log.d("StepCounterService", "OnSignificantMotionDetected")
+    override fun onMotion() {
+        Log.d("StepCounterService", "OnMotionDetected")
         if (wakeLock == null) {
             getLock(this).acquire()
         }
@@ -480,11 +496,6 @@ class StepCounterService : Service(), StepCountingSensorListener, SignificantMot
         // Restart timer since user is moving
         rescheduleNoMotionTimer()
         rescheduleSyncStepsTimer()
-        stepCountingSensor.start()
+        stepCounter?.start()
     }
-}
-
-fun checkSensorAvailable(context: Context, sensorType: Int): Boolean {
-    return ContextCompat.getSystemService(context, SensorManager::class.java)
-        ?.getDefaultSensor(sensorType) != null
 }

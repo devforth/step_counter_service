@@ -27,8 +27,6 @@ class StepCounterService implements Observable {
   void invoke(String method, [Map<String, dynamic>? args]) =>
       _platform.invoke(method, args);
 
-  Future<SensorAvailability> checkSensorAvailability() => _platform.checkSensorAvailability();
-
   Future<void> configure({
     required AndroidConfiguration androidConfiguration,
   }) => _platform.configure(androidConfiguration: androidConfiguration);
@@ -38,11 +36,21 @@ class StepCounterService implements Observable {
   Future<bool> isServiceRunning() => _platform.isServiceRunning();
 
   Stream<int> onUpdateSteps() => _platform.on("updateSteps")
-      .transform(StreamTransformer.fromHandlers(
-      handleData: (data, sink) {
+    .transform(
+      StreamTransformer.fromHandlers(handleData: (data, sink) {
         if (data?['steps'] != null) {
           sink.add(data!['steps']!);
         }
-      }
-  ));
+    })
+  );
+
+  Stream<ServiceStatus> onServiceStatus() => _platform.on("serviceStatus")
+      .transform(
+        StreamTransformer.fromHandlers(handleData: (data, sink) {
+          sink.add(ServiceStatus(
+            stepCounter: data?['stepCounter'],
+            motionDetector: data?['motionDetector']
+          ));
+      })
+  );
 }

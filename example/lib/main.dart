@@ -41,7 +41,6 @@ class _MyAppState extends State<MyApp> {
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     await Permission.activityRecognition.request();
-    await service.checkSensorAvailability();
 
     await service.configure(androidConfiguration: AndroidConfiguration(
         onStart: onStart,
@@ -49,14 +48,18 @@ class _MyAppState extends State<MyApp> {
         defaultNotificationTitle: "Example Title",
         defaultNotificationContent: "Example Content",
     ));
-    await service.startService();
-
+    service.onServiceStatus().listen((status) {
+      print("FLUTTER MAIN GOT STATUS ${status.stepCounter} ${status.motionDetector}");
+    });
+    
     service.onUpdateSteps().listen((steps) {
       print("FLUTTER MAIN GOT STEPS $steps");
       setState(() {
         _stepCount = steps;
       });
     });
+
+    await service.startService();
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling

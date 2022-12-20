@@ -49,18 +49,6 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
   }
 
   @override
-  Future<SensorAvailability> checkSensorAvailability() async {
-    Map<String, dynamic> result =
-        await _channel.invokeMethod("checkSensorAvailability") ??
-            <String, dynamic>{};
-
-    return SensorAvailability(
-        stepCounterSensor: (result["stepCounter"] as bool),
-        linearAccelerationSensor: (result["linearAcceleration"] as bool),
-        significantMotionSensor: (result["significantMotion"] as bool));
-  }
-
-  @override
   Future<void> configure(
       {required AndroidConfiguration androidConfiguration}) async {
     _channel.setMethodCallHandler(_handle);
@@ -70,12 +58,6 @@ class StepCounterServiceAndroid extends StepCounterServicePlatform {
 
     if (handle == null) {
       throw 'onStart method must be a top-level or static function';
-    }
-
-    var sensorAvailability = await checkSensorAvailability();
-
-    if ((!sensorAvailability.stepCounterSensor && !sensorAvailability.linearAccelerationSensor) || !sensorAvailability.significantMotionSensor) {
-      throw 'Device does not have required sensors for step counting';
     }
 
     await _channel.invokeMethod(

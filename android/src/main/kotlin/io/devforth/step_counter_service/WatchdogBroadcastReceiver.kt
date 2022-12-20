@@ -12,14 +12,13 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.AlarmManagerCompat
-import androidx.core.content.ContextCompat
 
 private const val QUEUE_REQUEST_ID = 0x12412
 private const val WATCHDOG_RESPAWN_ACTION: String = "id.devforth/step_counter_service.WATCHDOG_RESPAWN"
 
 class WatchdogBroadcastReceiver : BroadcastReceiver() {
     companion object {
-        fun enqueue(context: Context, millis: Int = 60_000) {
+        fun enqueue(context: Context, millis: Int = 600_000) {
             val intent = Intent(
                 context,
                 WatchdogBroadcastReceiver::class.java
@@ -36,7 +35,7 @@ class WatchdogBroadcastReceiver : BroadcastReceiver() {
 
             val pIntent: PendingIntent =
                 PendingIntent.getBroadcast(context, QUEUE_REQUEST_ID, intent, flags)
-            AlarmManagerCompat.setAndAllowWhileIdle(manager, AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + millis, pIntent)
+            AlarmManagerCompat.setExactAndAllowWhileIdle(manager, AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + millis, pIntent)
         }
 
         fun cancel(context: Context) {
@@ -83,11 +82,13 @@ class WatchdogBroadcastReceiver : BroadcastReceiver() {
                         if (e::class.java == ForegroundServiceStartNotAllowedException::class.java) {
                             Log.e("OnBootBR", "Got ForegroundServiceStartNotAllowedException")
                             Log.e("OnBootBR", e.stackTraceToString())
-                        }
-                        else if (e::class.java == BackgroundServiceStartNotAllowedException::class.java) {
+                        } else if (e::class.java == BackgroundServiceStartNotAllowedException::class.java) {
                             Log.e("OnBootBR", "Got BackgroundServiceStartNotAllowedException")
                             Log.e("OnBootBR", e.stackTraceToString())
                         }
+                    } else if(e::class.java == java.lang.IllegalStateException::class.java) {
+                        Log.e("OnBootBR", "Got IllegalStateException")
+                        Log.e("OnBootBR", e.stackTraceToString())
                     } else {
                         throw e
                     }
