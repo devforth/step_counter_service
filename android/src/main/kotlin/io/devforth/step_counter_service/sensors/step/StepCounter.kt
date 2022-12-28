@@ -3,14 +3,8 @@ package io.devforth.step_counter_service.sensors.step
 import android.content.Context
 import android.hardware.SensorEvent
 import android.os.Build
+import io.devforth.step_counter_service.BuildConfig
 import io.devforth.step_counter_service.sensors.ListenableSensor
-
-private val SUPPORTED_SENSORS =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-        listOf(SensorStepCounter::class.java, AccelerometerStepDetector::class.java)
-    } else {
-        listOf(AccelerometerStepDetector::class.java)
-    }
 
 interface StepCountingSensorListener {
     fun onStepCountChanged(stepCount: Int)
@@ -30,22 +24,19 @@ abstract class StepCounter(
             this.listeners.forEach { it.onStepCountChanged(stepCount) }
         }
     }
-
     companion object {
         fun getBest(context: Context, desired: Class<out StepCounter>? = null): StepCounter? {
-            if (desired != null) {
+            if (BuildConfig.DEBUG && desired != null) {
                 return desired.constructors[0].newInstance(context) as StepCounter
             }
 
-            for (sensor in SUPPORTED_SENSORS) {
-                try {
-                    return sensor.constructors[0].newInstance(context) as StepCounter
-                } catch (_: Exception) {
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                try { return SensorStepCounter(context) } catch (_: Exception) {}
             }
 
+            try { return AccelerometerStepDetector(context) } catch (_: Exception) {}
+
             return null
-//            throw Exception("Not supported sensor available on this device")
         }
     }
 }

@@ -228,6 +228,16 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
         // Step counting is not supported, no point in starting watchdog\flutter part of the service
         if (this.stepCounter == null) {
+            if (config.isForeground) {
+                startForeground(FOREGROUND_ID, notificationBuilder.setContentText("Failed to initialize step counting service").build())
+            }
+
+            Timer().schedule(object : TimerTask() {
+                override fun run() {
+                    this@StepCounterService.stopSelf()
+                }
+            }, 5000)
+
             return START_STICKY
         }
 

@@ -3,10 +3,12 @@ package io.devforth.step_counter_service.sensors.motion
 import android.content.Context
 import android.hardware.SensorEvent
 import android.hardware.TriggerEvent
+import android.os.Build
+import io.devforth.step_counter_service.BuildConfig
 import io.devforth.step_counter_service.sensors.ListenableSensor
+import io.devforth.step_counter_service.sensors.step.AccelerometerStepDetector
+import io.devforth.step_counter_service.sensors.step.SensorStepCounter
 import io.devforth.step_counter_service.sensors.step.StepCounter
-
-private val SUPPORTED_SENSORS = listOf(SignificantMotionDetector::class.java)
 
 interface MotionDetectorLister {
     fun onMotion()
@@ -34,19 +36,13 @@ abstract class MotionDetector(
 
     companion object {
         fun getBest(context: Context, desired: Class<out MotionDetector>? = null): MotionDetector? {
-            if (desired != null) {
+            if (BuildConfig.DEBUG && desired != null) {
                 return desired.constructors[0].newInstance(context) as MotionDetector
             }
 
-            for (sensor in SUPPORTED_SENSORS) {
-                try {
-                    return sensor.constructors[0].newInstance(context) as MotionDetector
-                } catch (_: Exception) {
-                }
-            }
+            try { return SignificantMotionDetector(context) } catch (_: Exception) {}
 
             return null
-//            throw Exception("Not supported sensor available on this device")
         }
     }
 }
