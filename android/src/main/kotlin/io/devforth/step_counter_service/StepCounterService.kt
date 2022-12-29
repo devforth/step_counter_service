@@ -234,7 +234,10 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
             Timer().schedule(object : TimerTask() {
                 override fun run() {
-                    this@StepCounterService.stopSelf()
+                    handler.post {
+                        this@StepCounterService.stopForeground(true)
+                        this@StepCounterService.stopSelf()
+                    }
                 }
             }, 5000)
 
