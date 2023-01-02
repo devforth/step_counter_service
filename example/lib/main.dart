@@ -30,6 +30,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   int _stepCount = 0;
+  String? _stepCounter;
+  String? _motionDetector;
   final service = StepCounterService();
 
   @override
@@ -50,6 +52,11 @@ class _MyAppState extends State<MyApp> {
     ));
     service.onServiceStatus().listen((status) {
       print("FLUTTER MAIN GOT STATUS ${status.stepCounter} ${status.motionDetector}");
+
+      setState(() {
+        _stepCounter = status.stepCounter;
+        _motionDetector = status.motionDetector;
+      });
     });
     
     service.onUpdateSteps().listen((steps) {
@@ -76,7 +83,7 @@ class _MyAppState extends State<MyApp> {
         ),
         body: Center(
           child: GestureDetector(
-            child: Text('Step count: $_stepCount\n'),
+            child: Text('Step count: $_stepCount\nStep counter: $_stepCounter\nMotion detector: $_motionDetector'),
             onTap: () => {
               // service.invoke('setForeground', { 'value': false })
             },

@@ -3,8 +3,8 @@ package io.devforth.step_counter_service.sensors.step
 import android.content.Context
 import android.hardware.SensorEvent
 import android.os.Build
-import io.devforth.step_counter_service.BuildConfig
 import io.devforth.step_counter_service.sensors.ListenableSensor
+import io.devforth.step_counter_service.BuildConfig
 
 interface StepCountingSensorListener {
     fun onStepCountChanged(stepCount: Int)
@@ -34,7 +34,8 @@ abstract class StepCounter(
                 try { return SensorStepCounter(context) } catch (_: Exception) {}
             }
 
-            try { return AccelerometerStepDetector(context) } catch (_: Exception) {}
+            try { return LinearAccelerationStepDetector(context) } catch (_: Exception) {}
+//            try { return AccelerometerStepCounter(context) } catch (_: Exception) {}
 
             return null
         }

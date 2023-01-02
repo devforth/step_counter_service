@@ -13,6 +13,8 @@ import androidx.core.app.NotificationCompat
 import io.devforth.step_counter_service.sensors.*
 import io.devforth.step_counter_service.sensors.motion.MotionDetector
 import io.devforth.step_counter_service.sensors.motion.MotionDetectorLister
+import io.devforth.step_counter_service.sensors.step.AccelerometerStepCounter
+import io.devforth.step_counter_service.sensors.step.LinearAccelerationStepDetector
 import io.devforth.step_counter_service.sensors.step.StepCounter
 import io.devforth.step_counter_service.sensors.step.StepCountingSensorListener
 import io.flutter.FlutterInjector
@@ -154,7 +156,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
     private fun rescheduleSyncStepsTimer() {
         this.syncStepsTimer?.cancel()
         this.syncStepsTimer = Timer("SyncStepsTimer", false)
-        this.syncStepsTimer?.scheduleAtFixedRate(syncStepsTimerTask(), 1000, 10 * 1000)
+        this.syncStepsTimer?.scheduleAtFixedRate(syncStepsTimerTask(), 1000, 1 * 1000)
     }
 
 
@@ -168,13 +170,18 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
         createNotificationChannel()
         createNotification()
 
-        stepCounter = StepCounter.getBest(this)
+        stepCounter = StepCounter.getBest(this, AccelerometerStepCounter::class.java)
+
         motionDetector = MotionDetector.getBest(this)
 
         stepCounter?.registerListener(this)
         motionDetector?.registerListener(this)
 
         stepCounter?.start()
+
+//        val test = StepCounter.getBest(this, LinearAccelerationStepDetector::class.java)
+//        test?.start()
+
 
         rescheduleNoMotionTimer()
         rescheduleSyncStepsTimer()

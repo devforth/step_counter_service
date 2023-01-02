@@ -3,18 +3,16 @@ package io.devforth.step_counter_service.sensors.step
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
-import android.hardware.SensorManager
 import android.os.SystemClock
 import android.util.Log
 import kotlin.math.abs
-import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 import kotlin.properties.Delegates
 
-private const val PEAK_THRESHOLD = 0.75f
+private const val PEAK_THRESHOLD = 3f
 
-class AccelerometerStepCounter(context: Context) :
-    StepCounter(Sensor.TYPE_ACCELEROMETER, context) {
+class LinearAccelerationStepDetector(context: Context) :
+    StepCounter(Sensor.TYPE_LINEAR_ACCELERATION, context) {
 
     private val sharedPreferences = context.getSharedPreferences("id.devforth.step_counter_service.accelerometer", Context.MODE_PRIVATE)
 
@@ -37,9 +35,6 @@ class AccelerometerStepCounter(context: Context) :
     private var lastPeakTime: Long = 0L
     private var lastPeak: Float = 0f
     private var lastPeakDiff: Float = 0f
-
-    private val gravity = FloatArray(3)
-    private var lastEventTime: Long = 0L
 
 //    private var i = 0
 //    private val accelerometerXAxis = mutableListOf<Float>()
@@ -69,37 +64,11 @@ class AccelerometerStepCounter(context: Context) :
     override fun updateStepCount(event: SensorEvent): Int {
 //        debugWrite(event)
 
-//        if (event.timestamp - lastEventTime < 50_000_000) {
-//            return currentStepCount
-//        }
-        lastEventTime = event.timestamp
-
         if (startVector.count() >= 3) {
             startVector.removeAt(0)
         }
 
-        // the following part will add some basic low/high-pass filter
-        // to ignore earth acceleration
-        val alpha = 0.9f;
-
-        // Isolate the force of gravity with the low-pass filter.
-        gravity[0] = (1 - alpha) * gravity[0] + alpha * event.values[0]
-        gravity[1] = (1 - alpha) * gravity[1] + alpha * event.values[1]
-        gravity[2] = (1 - alpha) * gravity[2] + alpha * event.values[2]
-
-        // Remove the gravity contribution with the high-pass filter.
-        val linearAcceleration = floatArrayOf(
-            event.values[0],
-            event.values[1],
-            event.values[2]
-        )
-
-//        Log.d(
-//            "AccelerometerSCS",
-//            "Values ${linearAcceleration.joinToString(",")}"
-//        )
-
-        startVector.add((sqrt(linearAcceleration[0] * linearAcceleration[0] + linearAcceleration[1] * linearAcceleration[1] + linearAcceleration[2] * linearAcceleration[2]) - SensorManager.GRAVITY_EARTH).absoluteValue)
+        startVector.add(sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2]))
 
         // Need 3 points in start vector to look for peaks
         if (startVector.count() != 3) {

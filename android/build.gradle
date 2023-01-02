@@ -41,6 +41,6 @@ android {
     }
     defaultConfig {
         minSdk 18
+        consumerProguardFiles 'proguard-rules.pro'
     }
-
 }

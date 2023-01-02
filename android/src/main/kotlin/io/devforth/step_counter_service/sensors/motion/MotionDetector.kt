@@ -3,12 +3,8 @@ package io.devforth.step_counter_service.sensors.motion
 import android.content.Context
 import android.hardware.SensorEvent
 import android.hardware.TriggerEvent
-import android.os.Build
 import io.devforth.step_counter_service.BuildConfig
 import io.devforth.step_counter_service.sensors.ListenableSensor
-import io.devforth.step_counter_service.sensors.step.AccelerometerStepDetector
-import io.devforth.step_counter_service.sensors.step.SensorStepCounter
-import io.devforth.step_counter_service.sensors.step.StepCounter
 
 interface MotionDetectorLister {
     fun onMotion()
