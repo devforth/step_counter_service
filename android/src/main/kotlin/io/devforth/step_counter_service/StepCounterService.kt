@@ -170,8 +170,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
         createNotificationChannel()
         createNotification()
 
-        stepCounter = StepCounter.getBest(this, AccelerometerStepCounter::class.java)
-
+        stepCounter = StepCounter.getBest(this)
         motionDetector = MotionDetector.getBest(this)
 
         stepCounter?.registerListener(this)
