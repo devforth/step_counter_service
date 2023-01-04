@@ -178,10 +178,6 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
         stepCounter?.start()
 
-//        val test = StepCounter.getBest(this, LinearAccelerationStepDetector::class.java)
-//        test?.start()
-
-
         rescheduleNoMotionTimer()
         rescheduleSyncStepsTimer()
     }

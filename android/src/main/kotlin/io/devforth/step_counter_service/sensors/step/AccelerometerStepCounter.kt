@@ -6,14 +6,18 @@ import android.hardware.SensorEvent
 import android.hardware.SensorManager
 import android.os.SystemClock
 import android.util.Log
+import java.io.BufferedWriter
+import java.io.OutputStreamWriter
+import java.io.PrintWriter
+import java.net.Socket
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 import kotlin.properties.Delegates
 
-private const val PEAK_THRESHOLD = 0.75f
+private const val PEAK_THRESHOLD = 1.2f
 
-class AccelerometerStepCounter(context: Context) :
+class AccelerometerStepCounter(private val context: Context) :
     StepCounter(Sensor.TYPE_ACCELEROMETER, context) {
 
     private val sharedPreferences = context.getSharedPreferences("id.devforth.step_counter_service.accelerometer", Context.MODE_PRIVATE)
