@@ -511,7 +511,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
                     e.printStackTrace()
                 }
             }
-            "rescheduleTasks" -> {
+            "rescheduleTimers" -> {
                 try {
                     rescheduleNoMotionTimer()
                     rescheduleSyncStepsTimer()
