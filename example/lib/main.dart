@@ -19,6 +19,10 @@ void onStart(ServiceInstance serviceInstance) {
     print("FLUTTER BG GOT STEPS $steps");
     serviceInstance.updateNotification(title: "Example Title BG", content: "Example Content. Steps: $steps");
   });
+
+  serviceInstance.onPing().listen((event) {
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
+  });
 }
 
 class MyApp extends StatefulWidget {

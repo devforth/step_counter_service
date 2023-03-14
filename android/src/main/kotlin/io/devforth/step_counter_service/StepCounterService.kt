@@ -147,7 +147,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
                         val data = updateStepsMessage(currentStepCount!!).toString()
 
-                        this@StepCounterService.invoke(data)
+                        this@StepCounterService.binder.invoke(data)
                     }
                 }
             }
@@ -164,11 +164,11 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
         return object : TimerTask() {
             override fun run() {
                 handler.post {
-                    Log.d("StepCounterService", "SyncSteps TimerTask: $currentStepCount")
+                    Log.d("StepCounterService", "Ping TimerTask")
 
                     val data = JSONObject(mapOf("method" to "ping", "args" to mapOf<String, String>())).toString()
 
-                    this@StepCounterService.invoke(data)
+                    this@StepCounterService.binder.invoke(data)
                 }
             }
         }
