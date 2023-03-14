@@ -103,6 +103,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
     private var noMotionTimer: Timer? = null
     private var syncStepsTimer: Timer? = null
+    private var pingTimer: Timer? = null
 
     private fun noMotionTimerTask(): TimerTask {
         return object : TimerTask() {
@@ -138,6 +139,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
                 handler.post {
                     if (currentStepCount == null) return@post
 
+                    Log.d("StepCounterService", "SyncSteps TimerTask: Pre Check $lastSentStepCount $currentStepCount")
                     if (lastSentStepCount != currentStepCount) {
                         Log.d("StepCounterService", "SyncSteps TimerTask: $currentStepCount")
                         lastSentStepCount = currentStepCount
@@ -146,7 +148,6 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
                         val data = updateStepsMessage(currentStepCount!!).toString()
 
                         this@StepCounterService.invoke(data)
-                        this@StepCounterService.binder.invoke(data)
                     }
                 }
             }
@@ -156,7 +157,27 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
     private fun rescheduleSyncStepsTimer() {
         this.syncStepsTimer?.cancel()
         this.syncStepsTimer = Timer("SyncStepsTimer", false)
-        this.syncStepsTimer?.scheduleAtFixedRate(syncStepsTimerTask(), 1000, 1 * 1000)
+        this.syncStepsTimer?.scheduleAtFixedRate(syncStepsTimerTask(), 1000, 10 * 1000)
+    }
+
+    private fun pingTimerTask(): TimerTask {
+        return object : TimerTask() {
+            override fun run() {
+                handler.post {
+                    Log.d("StepCounterService", "SyncSteps TimerTask: $currentStepCount")
+
+                    val data = JSONObject(mapOf("method" to "ping", "args" to mapOf<String, String>())).toString()
+
+                    this@StepCounterService.invoke(data)
+                }
+            }
+        }
+    }
+
+    private fun reschedulePingTimer() {
+        this.pingTimer?.cancel()
+        this.pingTimer = Timer("PingTimer", false)
+        this.pingTimer?.scheduleAtFixedRate(pingTimerTask(), 0, 5 * 1000)
     }
 
 
@@ -180,6 +201,7 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
 
         rescheduleNoMotionTimer()
         rescheduleSyncStepsTimer()
+        reschedulePingTimer()
     }
 
     @SuppressLint("WakelockTimeout")
@@ -484,6 +506,17 @@ class StepCounterService : Service(), StepCountingSensorListener, MotionDetector
             "invoke" -> {
                 try {
                     invoke(call.arguments.toString())
+                    result.success(true)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            "rescheduleTasks" -> {
+                try {
+                    rescheduleNoMotionTimer()
+                    rescheduleSyncStepsTimer()
+                    reschedulePingTimer()
+
                     result.success(true)
                 } catch (e: Exception) {
                     e.printStackTrace()

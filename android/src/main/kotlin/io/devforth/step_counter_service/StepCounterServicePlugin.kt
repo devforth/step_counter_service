@@ -32,10 +32,13 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
     private var serviceBinder: IStepCounterServiceBinder? = null
     private lateinit var serviceConnection: ServiceConnection
 
+    private var shouldUnbind: Boolean = false
+
     init {
         serviceConnection = object : ServiceConnection {
             override fun onServiceDisconnected(name: ComponentName?) {
                 try {
+                    shouldUnbind = false
                     serviceBinder!!.unbind(serviceBinderId)
                     serviceBinder = null
                 } catch (e: Exception) {
@@ -74,6 +77,8 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         Log.d("SCSPlugin", "onAttachedToEngine")
 
+        shouldUnbind = false;
+
         context = flutterPluginBinding.applicationContext
         handler = Handler(context.mainLooper)
 
@@ -98,7 +103,7 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
             context.startService(intent)
         }
 
-        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        shouldUnbind = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         WatchdogBroadcastReceiver.enqueue(context)
     }
 
@@ -156,7 +161,10 @@ class StepCounterServicePlugin : FlutterPlugin, MethodCallHandler, ServiceAware 
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         Log.d("SCSPlugin", "onDetachedFromEngine")
-
+        if (shouldUnbind && serviceBinder != null) {
+            binding.applicationContext.unbindService(serviceConnection)
+            shouldUnbind = false
+        }
         channel.setMethodCallHandler(null)
     }
 

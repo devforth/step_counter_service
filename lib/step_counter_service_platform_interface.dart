@@ -43,12 +43,16 @@ abstract class Observable {
 }
 
 abstract class ServiceInstance implements Observable {
+
   Stream<int> onUpdateSteps();
+  Stream<void> onPing();
 
   Future<void> updateNotification({
     required String title,
     required String content,
   });
+
+  Future<void> rescheduleTimers();
 
   Future<void> stop();
 

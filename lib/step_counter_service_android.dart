@@ -150,12 +150,26 @@ class AndroidServiceInstance extends ServiceInstance {
   }
 
   @override
+  Stream<void> onPing() => on("ping")
+      .transform(
+      StreamTransformer.fromHandlers(handleData: (data, sink) {
+        sink.add(null);
+      })
+  );
+
+
+  @override
   Stream<int> onUpdateSteps() => on("updateSteps")
           .transform(StreamTransformer.fromHandlers(handleData: (data, sink) {
         if (data?['steps'] != null) {
           sink.add(data!['steps']!);
         }
       }));
+
+  @override
+  Future<void> rescheduleTimers() async {
+     await _channel.invokeMethod("rescheduleTimers");
+  }
 
   @override
   Future<void> stop() async {

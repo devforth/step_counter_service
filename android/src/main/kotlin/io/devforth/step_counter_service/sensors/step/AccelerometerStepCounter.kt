@@ -6,16 +6,13 @@ import android.hardware.SensorEvent
 import android.hardware.SensorManager
 import android.os.SystemClock
 import android.util.Log
-import java.io.BufferedWriter
 import java.io.OutputStreamWriter
-import java.io.PrintWriter
-import java.net.Socket
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 import kotlin.properties.Delegates
 
-private const val PEAK_THRESHOLD = 1.2f
+private const val PEAK_THRESHOLD = 3f
 
 class AccelerometerStepCounter(private val context: Context) :
     StepCounter(Sensor.TYPE_ACCELEROMETER, context) {
@@ -45,25 +42,28 @@ class AccelerometerStepCounter(private val context: Context) :
     private val gravity = FloatArray(3)
     private var lastEventTime: Long = 0L
 
-//    private var i = 0
-//    private val accelerometerXAxis = mutableListOf<Float>()
-//    private val accelerometerYAxis = mutableListOf<Float>()
-//    private val accelerometerZAxis = mutableListOf<Float>()
-//    private fun debugWrite(se: SensorEvent) {
-//        i += 1
-//        accelerometerXAxis.add(se.values[0])
-//        accelerometerYAxis.add(se.values[1])
-//        accelerometerZAxis.add(se.values[2])
-//
-//        if (i % 100 == 0) {
-//            val outputStreamWriter =
-//                OutputStreamWriter(context.openFileOutput("config.txt", Context.MODE_PRIVATE))
-//            outputStreamWriter.write(accelerometerXAxis.joinToString(", ") + "\n")
-//            outputStreamWriter.write(accelerometerYAxis.joinToString(", ") + "\n")
-//            outputStreamWriter.write(accelerometerZAxis.joinToString(", ") + "\n")
-//            outputStreamWriter.close()
-//        }
-//    }
+    private var i = 0
+    private val accelerometerXAxis = mutableListOf<Float>()
+    private val accelerometerYAxis = mutableListOf<Float>()
+    private val accelerometerZAxis = mutableListOf<Float>()
+    private val accelerometerTimeAxis = mutableListOf<Long>()
+    private fun debugWrite(se: SensorEvent) {
+        i += 1
+        accelerometerXAxis.add(se.values[0])
+        accelerometerYAxis.add(se.values[1])
+        accelerometerZAxis.add(se.values[2])
+        accelerometerTimeAxis.add(se.timestamp)
+
+        if (i % 100 == 0) {
+            val outputStreamWriter =
+                OutputStreamWriter(context.openFileOutput("config.txt", Context.MODE_PRIVATE))
+            outputStreamWriter.write(accelerometerXAxis.joinToString(", ") + "\n")
+            outputStreamWriter.write(accelerometerYAxis.joinToString(", ") + "\n")
+            outputStreamWriter.write(accelerometerZAxis.joinToString(", ") + "\n")
+            outputStreamWriter.write(accelerometerTimeAxis.joinToString(", ") + "\n")
+            outputStreamWriter.close()
+        }
+    }
 
     override fun start() {
         listeners.forEach { it.onStepCountChanged(currentStepCount) }
@@ -71,7 +71,7 @@ class AccelerometerStepCounter(private val context: Context) :
     }
 
     override fun updateStepCount(event: SensorEvent): Int {
-//        debugWrite(event)
+        debugWrite(event)
 
 //        if (event.timestamp - lastEventTime < 50_000_000) {
 //            return currentStepCount
@@ -103,7 +103,7 @@ class AccelerometerStepCounter(private val context: Context) :
 //            "Values ${linearAcceleration.joinToString(",")}"
 //        )
 
-        startVector.add((sqrt(linearAcceleration[0] * linearAcceleration[0] + linearAcceleration[1] * linearAcceleration[1] + linearAcceleration[2] * linearAcceleration[2]) - SensorManager.GRAVITY_EARTH).absoluteValue)
+        startVector.add(sqrt(linearAcceleration[0] * linearAcceleration[0] + linearAcceleration[1] * linearAcceleration[1] + linearAcceleration[2] * linearAcceleration[2] - SensorManager.GRAVITY_EARTH * SensorManager.GRAVITY_EARTH))
 
         // Need 3 points in start vector to look for peaks
         if (startVector.count() != 3) {
@@ -112,7 +112,7 @@ class AccelerometerStepCounter(private val context: Context) :
 
         // Peak detection
         if (startVector[1] > startVector[0] && startVector[1] > startVector[2]) {
-//            Log.d("AccelerometerSCS", "Current value ${startVector[1]}")
+            Log.d("AccelerometerSCS", "Current value ${startVector[1]}")
             if (startVector[1] < PEAK_THRESHOLD) {
 //                Log.d("AccelerometerSCS", "Peak too small ${startVector[1]}")
                 return currentStepCount
